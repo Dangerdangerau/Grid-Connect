@@ -1,7 +1,6 @@
 {
   "name": "Grid Connect",
+  "content_in_root": false,
   "render_readme": true,
-  "homeassistant": "2025.8.0",
-  "zip_release": true,
-  "filename": "grid_connect.zip"
+  "homeassistant": "2023.1.0"
 }
