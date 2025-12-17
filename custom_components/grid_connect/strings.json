@@ -7,6 +7,13 @@
           "username": "[%key:common::config_flow::data::username%]",
           "password": "[%key:common::config_flow::data::password%]"
         }
+      },
+      "no_devices_found": {
+        "title": "No devices found",
+        "description": "Is your device in pairing mode?",
+        "data": {
+          "action": "Choose an action"
+        }
       }
     },
     "error": {

@@ -72,14 +72,44 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             raise
 
         if not devices:
-            _LOGGER.info("No BLE devices discovered, falling back to manual configuration.")
-            errors["base"] = "no_devices"
-            return await self.async_step_manual()
+            _LOGGER.info("No BLE devices discovered, showing no devices found step.")
+            return await self.async_step_no_devices_found()
 
         self.context["discovered_ble_devices"] = devices
         return await self.async_step_select_ble_device()
 
+    async def async_step_no_devices_found(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Show options when no devices are found during BLE scan."""
+        errors: dict[str, str] = {}
 
+        if user_input is not None:
+            action = user_input.get("action")
+            if action == "scan_again":
+                _LOGGER.info("User chose to scan again from no devices found step.")
+                return await self.async_step_ble_scan()
+            elif action == "manual":
+                _LOGGER.info("User chose manual entry from no devices found step.")
+                return await self.async_step_manual()
+
+        return self.async_show_form(
+            step_id="no_devices_found",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("action", default="scan_again"): vol.In(
+                        {
+                            "scan_again": "Scan again",
+                            "manual": "Manual entry",
+                        }
+                    ),
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "note": "Is your device in pairing mode?",
+            },
+        )
 
     async def async_step_select_ble_device(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:
         """Present discovered BLE devices and let the user select one."""
