@@ -108,12 +108,12 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "device_not_found"
 
         return self.async_show_form(
-            step_id=\"select_ble_device\",
+            step_id="select_ble_device",
             data_schema=vol.Schema({
-                vol.Required(\"selected_device\"): vol.In(devices_for_selection)
+                vol.Required("selected_device"): vol.In(devices_for_selection)
             }),
             errors=errors,
-            description_placeholders={\"devices\": \", \".join(devices_for_selection.values())}
+            description_placeholders={"devices": ", ".join(devices_for_selection.values())}
         )
 
 
