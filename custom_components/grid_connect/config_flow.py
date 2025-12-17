@@ -15,6 +15,7 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 
 from .const import DOMAIN
+from .ble_wifi import send_wifi_credentials
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,43 +42,240 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_ble_scan(self, user_input=None) -> config_entries.ConfigFlowResult:
         """Scan for Grid Connect devices via BLE and present selection."""
         errors = {}
-        # Grid Connect BLE service UUID (replace with actual UUID if known)
-        GRID_CONNECT_SERVICE_UUID = "0000fd88-0000-1000-8000-00805f9b34fb"
+        # We'll scan for 10 seconds and collect all BLE devices
         devices = []
         seen_addresses = set()
-
-        # Use Home Assistant's bluetooth.async_discovered_service_info to get BLE advertisements
-        # We'll scan for 10 seconds and collect devices advertising the Grid Connect UUID
-        start_time = time.monotonic()
         scan_duration = 10  # seconds
+        start_time = time.monotonic()
+
         try:
             while time.monotonic() - start_time < scan_duration:
+                # Use Home Assistant's bluetooth.async_discovered_service_info to get BLE advertisements
                 for service_info in self.hass.data.get("bluetooth", {}).get("discovered_service_info", []):
+                    # Collect all devices that have service_uuids and haven't been seen yet
                     if (
                         hasattr(service_info, "service_uuids")
-                        and GRID_CONNECT_SERVICE_UUID in service_info.service_uuids
                         and service_info.address not in seen_addresses
                     ):
                         devices.append({
                             "id": service_info.address,
-                            "name": service_info.name or "Grid Connect Device",
+                            "name": service_info.name or "Unnamed BLE Device",
                             "address": service_info.address,
+                            "service_uuids": list(service_info.service_uuids),
                         })
                         seen_addresses.add(service_info.address)
                 await asyncio.sleep(1)
         except (TimeoutError, AttributeError) as e:
-            _LOGGER.warning("BLE scan error: %s", e)
+            _LOGGER.warning("BLE scan error during discovery: %s", e)
         except Exception as e:
-            _LOGGER.error("Unexpected BLE scan error: %s", e)
+            _LOGGER.error("Unexpected BLE scan error during discovery: %s", e)
             raise
 
         if not devices:
+            _LOGGER.info("No BLE devices discovered, falling back to manual configuration.")
             errors["base"] = "no_devices"
             return await self.async_step_manual()
-        self.context["devices"] = devices
-        return await self.async_step_select_device()
+
+        self.context["discovered_ble_devices"] = devices
+        return await self.async_step_select_ble_device()
 
 
+
+    async def async_step_select_ble_device(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:
+        """Present discovered BLE devices and let the user select one."""
+        errors = {}
+        discovered_devices = self.context.get("discovered_ble_devices", [])
+        if not discovered_devices:
+            _LOGGER.warning("No BLE devices found in context for selection.")
+            errors["base"] = "no_devices_for_selection"
+            return await self.async_step_manual()
+
+        # Create a mapping of address to a more user-friendly name for the form
+        devices_for_selection = {
+            d["address"]: f"{d['name']} ({d['address']})" for d in discovered_devices
+        }
+
+        if user_input is not None:
+            selected_address = user_input["selected_device"]
+            selected_device = next(
+                (d for d in discovered_devices if d["address"] == selected_address), None
+            )
+
+            if selected_device:
+                self.context["selected_ble_device"] = selected_device
+                return await self.async_step_identify_grid_connect_uuid()
+            else:
+                errors["base"] = "device_not_found"
+
+        return self.async_show_form(
+            step_id=\"select_ble_device\",
+            data_schema=vol.Schema({
+                vol.Required(\"selected_device\"): vol.In(devices_for_selection)
+            }),
+            errors=errors,
+            description_placeholders={\"devices\": \", \".join(devices_for_selection.values())}
+        )
+
+
+    async def async_step_identify_grid_connect_uuid(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Identify the Grid Connect UUID from the selected device's service UUIDs."""
+        selected_device = self.context.get("selected_ble_device")
+
+        if not selected_device or "service_uuids" not in selected_device:
+            _LOGGER.error("Selected BLE device or its service UUIDs not found in context.")
+            return await self.async_step_manual()
+
+        # Heuristic to find a non-standard, custom UUID that is likely the Grid Connect service.
+        # This is a basic approach and might need refinement based on actual device behavior.
+        grid_connect_uuid: str | None = None
+        for uuid in selected_device["service_uuids"]:
+            # Exclude obvious standard 16-bit-based UUIDs; treat others as custom candidates.
+            if uuid.startswith("0000") and len(uuid) > 8:
+                # Placeholder for more detailed filtering if needed.
+                continue
+
+            grid_connect_uuid = uuid
+            break
+
+        if grid_connect_uuid:
+            _LOGGER.info(
+                "Identified Grid Connect UUID: %s for device %s",
+                grid_connect_uuid,
+                selected_device["address"],
+            )
+            self.context["grid_connect_uuid"] = grid_connect_uuid
+            return await self.async_step_wifi_credentials()
+
+        _LOGGER.warning(
+            "Could not identify a unique Grid Connect UUID for device %s, "
+            "falling back to manual UUID selection.",
+            selected_device["address"],
+        )
+        return await self.async_step_select_fallback_uuid()
+
+    async def async_step_select_fallback_uuid(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Let the user pick a UUID or trigger a new scan when heuristic fails."""
+        selected_device = self.context.get("selected_ble_device")
+
+        if not selected_device or "service_uuids" not in selected_device:
+            _LOGGER.error(
+                "No selected device or service UUIDs available in context for fallback UUID selection."
+            )
+            return await self.async_step_manual()
+
+        service_uuids = selected_device["service_uuids"]
+        if not service_uuids:
+            _LOGGER.error(
+                "Selected device %s has no service UUIDs for fallback selection.",
+                selected_device.get("address"),
+            )
+            return await self.async_step_manual()
+
+        uuid_options = {uuid: uuid for uuid in service_uuids}
+
+        schema = vol.Schema(
+            {
+                vol.Required("action", default="use_uuid"): vol.In(
+                    {"use_uuid": "Use selected UUID", "scan_again": "Scan again"}
+                ),
+                vol.Optional("selected_uuid"): vol.In(uuid_options),
+            }
+        )
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            action = user_input.get("action")
+            if action == "scan_again":
+                _LOGGER.info("User chose to scan again from fallback UUID step.")
+                return await self.async_step_ble_scan()
+
+            if action == "use_uuid":
+                selected_uuid = user_input.get("selected_uuid")
+                if not selected_uuid:
+                    errors["base"] = "no_uuid_selected"
+                else:
+                    self.context["grid_connect_uuid"] = selected_uuid
+                    _LOGGER.info(
+                        "User selected UUID %s for device %s",
+                        selected_uuid,
+                        selected_device.get("address"),
+                    )
+                    return await self.async_step_wifi_credentials()
+
+        return self.async_show_form(
+            step_id="select_fallback_uuid",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "uuids": ", ".join(service_uuids),
+                "device": selected_device.get("name") or selected_device.get("address"),
+            },
+        )
+
+    async def async_step_wifi_credentials(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Ask the user for Wi-Fi credentials and send them via BLE."""
+        selected_device = self.context.get("selected_ble_device")
+        grid_connect_uuid = self.context.get("grid_connect_uuid")
+
+        if not selected_device or not grid_connect_uuid:
+            _LOGGER.error(
+                "Missing selected device or grid_connect_uuid in context before Wi-Fi step."
+            )
+            return await self.async_step_manual()
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            ssid = user_input["ssid"]
+            password = user_input["password"]
+
+            # Attempt to send Wi-Fi credentials over BLE
+            result = await send_wifi_credentials(
+                selected_device["address"], ssid, password
+            )
+
+            if result is None:
+                # Success - create the config entry
+                return self.async_create_entry(
+                    title=selected_device.get("name") or "Grid Connect Device",
+                    data={
+                        "device_address": selected_device["address"],
+                        "grid_connect_uuid": grid_connect_uuid,
+                        "device_name": selected_device.get("name") or "Grid Connect Device",
+                        "wifi_ssid": ssid,
+                    },
+                )
+
+            # Map specific error codes from send_wifi_credentials to form errors
+            _LOGGER.warning("Failed to send Wi-Fi credentials: %s", result)
+            if result == "bleak_not_installed":
+                errors["base"] = "bleak_not_installed"
+            elif result == "not_connected":
+                errors["base"] = "ble_not_connected"
+            elif result == "bleak_import_error":
+                errors["base"] = "ble_import_error"
+            elif result == "timeout":
+                errors["base"] = "ble_timeout"
+            else:
+                errors["base"] = "ble_unknown_error"
+
+        return self.async_show_form(
+            step_id="wifi_credentials",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("ssid"): str,
+                    vol.Required("password"): str,
+                }
+            ),
+            errors=errors,
+        )
 
     async def async_step_manual(self, user_input=None) -> config_entries.ConfigFlowResult:
         """Fallback: let user manually specify device details."""
@@ -102,38 +300,10 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_select_device(self, user_input=None):
-        """Let user select a device from their Grid Connect account."""
-        devices = self.context.get("devices", [])
-        device_names = {d["id"]: f"{d['name']} ({d['model']})" for d in devices}
-        errors = {}
-
-        if user_input is not None:
-            selected_id = user_input["device"]
-            selected = next((d for d in devices if d["id"] == selected_id), None)
-            if selected is not None:
-                # Save credentials and selected device in config entry
-                return self.async_create_entry(
-                    title=selected["name"],
-                    data={
-                        "username": self.context["username"],
-                        "password": self.context["password"],
-                        "device_id": selected_id,
-                        "device_name": selected["name"],
-                        "device_model": selected["model"],
-                    },
-                )
-        if selected is None:
-            errors["base"] = "device_not_found"
-
-        return self.async_show_form(
-            step_id="select_device",
-            data_schema=vol.Schema(
-                {vol.Required("device"): vol.In(device_names)}
-            ),
-            description_placeholders=device_names,
-            errors=errors,
-        )
+    async def async_step_select_device(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:
+        """Redirect to BLE scan as the primary device selection method."""
+        _LOGGER.info("Attempted to access async_step_select_device. Redirecting to BLE scan.")
+        return await self.async_step_ble_scan()
 
 
     @staticmethod
