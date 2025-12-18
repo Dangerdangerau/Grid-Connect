@@ -14,6 +14,15 @@
         "data": {
           "action": "Choose an action"
         }
+      },
+      "manual": {
+        "title": "Manual device entry",
+        "description": "Enter your device details manually. The device will be provisioned with Wi-Fi credentials after entry.",
+        "data": {
+          "device_name": "Device name",
+          "grid_connect_uuid": "Grid Connect UUID (BLE service UUID)",
+          "device_address": "BLE MAC address"
+        }
       }
     },
     "error": {

@@ -309,22 +309,25 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_manual(self, user_input=None) -> config_entries.ConfigFlowResult:
         """Fallback: let user manually specify device details."""
-        errors = {}
+        errors: dict[str, str] = {}
         if user_input is not None:
-            # Accept manual entry and create config entry
-            return self.async_create_entry(
-                title=user_input["device_name"],
-                data={
-                    "device_id": user_input["device_id"],
-                    "device_name": user_input["device_name"],
-                    "device_address": user_input["device_address"],
-                },
+            # Store manual entry data in context and proceed to Wi-Fi provisioning
+            self.context["selected_ble_device"] = {
+                "address": user_input["device_address"],
+                "name": user_input["device_name"],
+            }
+            self.context["grid_connect_uuid"] = user_input["grid_connect_uuid"]
+            _LOGGER.info(
+                "Manual entry: device %s with UUID %s, proceeding to Wi-Fi provisioning",
+                user_input["device_name"],
+                user_input["grid_connect_uuid"],
             )
+            return await self.async_step_wifi_credentials()
         return self.async_show_form(
             step_id="manual",
             data_schema=vol.Schema({
-                vol.Required("device_id"): str,
                 vol.Required("device_name"): str,
+                vol.Required("grid_connect_uuid"): str,
                 vol.Required("device_address"): str,
             }),
             errors=errors,
