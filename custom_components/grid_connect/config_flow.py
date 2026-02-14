@@ -13,8 +13,10 @@ import voluptuous as vol
 
 # noinspection PyUnresolvedReferences
 from homeassistant import config_entries
+
 # noinspection PyUnresolvedReferences
 from homeassistant.components import bluetooth
+
 # noinspection PyUnresolvedReferences
 from homeassistant.core import callback
 
