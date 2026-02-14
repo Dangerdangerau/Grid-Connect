@@ -45,9 +45,10 @@ def _is_identifier_like_name(name: str) -> bool:
         return False
     try:
         UUID(value)
-        return True
     except (ValueError, TypeError):
         pass
+    else:
+        return True
 
     compact = value.replace("-", "")
     if len(compact) >= 12 and re.fullmatch(r"[0-9A-Fa-f]+", compact):
