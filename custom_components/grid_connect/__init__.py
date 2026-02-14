@@ -47,6 +47,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GridConnectConfigEntry) 
     """Set up Grid Connect from a config entry."""
     try:
         hass.data.setdefault(DOMAIN, {})
+        _LOGGER.info("Setting up Grid Connect entry_id=%s", entry.entry_id)
 
         if entry.data.get("use_bluetooth"):
             # Handle Bluetooth device setup
@@ -68,6 +69,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: GridConnectConfigEntry) 
             coordinator = GridConnectDataUpdateCoordinator(hass, api_client)
             await coordinator.async_config_entry_first_refresh()
             hass.data[DOMAIN][entry.entry_id] = coordinator
+            _LOGGER.debug(
+                "Coordinator initialized for entry_id=%s host=%s",
+                entry.entry_id,
+                entry.data.get("host") or entry.data.get("device_address", ""),
+            )
 
             # Forward the configuration entry to the defined platforms
             await hass.config_entries.async_forward_entry_setups(entry, _PLATFORMS)
@@ -76,6 +82,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GridConnectConfigEntry) 
             return False
         else:
             entry.runtime_data = coordinator
+            _LOGGER.info("Grid Connect setup complete for entry_id=%s", entry.entry_id)
             return True
 
     except AuthenticationError as err:
@@ -94,6 +101,7 @@ async def async_unload_entry(
     """Unload a config entry."""
 
     # Remove the integration platforms when unloading the configuration entry
+    _LOGGER.info("Unloading Grid Connect entry_id=%s", entry.entry_id)
     unload_ok = await hass.config_entries.async_unload_platforms(entry, _PLATFORMS)
     if unload_ok and DOMAIN in hass.data:
         hass.data[DOMAIN].pop(entry.entry_id, None)

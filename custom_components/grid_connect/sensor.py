@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -18,6 +19,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator
 
 from .const import CONF_MODEL, DOMAIN, SUPPORTED_SMART_PLUG_MODELS
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -78,7 +81,17 @@ async def async_setup_entry(
 ) -> None:
     """Set up Grid Connect sensors."""
     if entry.data.get(CONF_MODEL) not in SUPPORTED_SMART_PLUG_MODELS:
+        _LOGGER.debug(
+            "Skipping sensor setup for entry %s model=%s",
+            entry.entry_id,
+            entry.data.get(CONF_MODEL),
+        )
         return
+    _LOGGER.info(
+        "Setting up energy sensor platform for entry %s model=%s",
+        entry.entry_id,
+        entry.data.get(CONF_MODEL),
+    )
     coordinator: DataUpdateCoordinator[Any] = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
         [GridConnectSensor(entry, coordinator, description) for description in SENSORS]

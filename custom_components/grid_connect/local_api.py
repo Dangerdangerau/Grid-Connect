@@ -31,6 +31,7 @@ class GridConnectAPI:
         self._voltage_v = 240.0
         self._energy_kwh_total = 0.0
         self._energy_kwh_today = 0.0
+        _LOGGER.info("Initialized GridConnectAPI for host=%s model=%s", host, model)
 
     async def get_data(self) -> dict[str, Any]:
         """Fetch data from the device.
@@ -50,6 +51,14 @@ class GridConnectAPI:
                 "energy_kwh_total": self._energy_kwh_total,
                 "energy_kwh_today": self._energy_kwh_today,
             }
+            _LOGGER.debug(
+                "Telemetry host=%s switch=%s power_w=%.3f current_a=%.3f voltage_v=%.3f",
+                self.host,
+                self._is_on,
+                self._power_w,
+                self._current_a,
+                self._voltage_v,
+            )
         except Exception as err:
             _LOGGER.error("Failed to get data from Grid Connect: %s", err)
             raise
@@ -59,12 +68,14 @@ class GridConnectAPI:
 
     async def async_turn_on(self) -> None:
         """Turn plug on."""
+        _LOGGER.info("Turning ON plug at host=%s", self.host)
         self._is_on = True
         self._power_w = 12.0
         self._current_a = round(self._power_w / max(self._voltage_v, 1.0), 3)
 
     async def async_turn_off(self) -> None:
         """Turn plug off."""
+        _LOGGER.info("Turning OFF plug at host=%s", self.host)
         self._is_on = False
         self._power_w = 0.0
         self._current_a = 0.0

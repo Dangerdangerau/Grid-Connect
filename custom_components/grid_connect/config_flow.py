@@ -16,7 +16,7 @@ from homeassistant.components import bluetooth
 from homeassistant.core import callback
 
 from .const import CONF_MODEL, DOMAIN, MODEL_PC191BKHA, MODEL_PC191HA
-from .ble_wifi import send_wifi_credentials
+from .ble_wifi import GRID_CONNECT_SERVICE_UUID, send_wifi_credentials
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,6 +62,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         seen_addresses = set()
         scan_duration = 10  # seconds
         start_time = time.monotonic()
+        _LOGGER.debug("Starting BLE scan for Grid Connect devices (%ss)", scan_duration)
 
         try:
             while time.monotonic() - start_time < scan_duration:
@@ -74,18 +75,26 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     # Backward compatibility with older signatures.
                     discovered = bluetooth.async_discovered_service_info(self.hass)
 
-                for service_info in discovered:
-                    # Collect all devices that have service_uuids and haven't been seen yet
+                # Some devices advertise as non-connectable during parts of pairing mode.
+                try:
+                    discovered_non_connectable = bluetooth.async_discovered_service_info(
+                        self.hass, connectable=False
+                    )
+                except TypeError:
+                    discovered_non_connectable = []
+
+                for service_info in [*discovered, *discovered_non_connectable]:
+                    # Collect all BLE devices by address; UUIDs may be absent in advertisements.
                     if (
-                        hasattr(service_info, "service_uuids")
-                        and service_info.service_uuids
+                        hasattr(service_info, "address")
+                        and service_info.address
                         and service_info.address not in seen_addresses
                     ):
                         devices.append({
                             "id": service_info.address,
                             "name": service_info.name or "Unnamed BLE Device",
                             "address": service_info.address,
-                            "service_uuids": list(service_info.service_uuids),
+                            "service_uuids": list(getattr(service_info, "service_uuids", []) or []),
                         })
                         seen_addresses.add(service_info.address)
                 await asyncio.sleep(1)
@@ -99,6 +108,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.info("No BLE devices discovered, showing no devices found step.")
             return await self.async_step_no_devices_found()
 
+        _LOGGER.info("Discovered %d BLE candidate devices", len(devices))
         self.context["discovered_ble_devices"] = devices
         return await self.async_step_select_ble_device()
 
@@ -156,6 +166,11 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
             if selected_device:
+                _LOGGER.debug(
+                    "Selected BLE device: %s (%s)",
+                    selected_device.get("name"),
+                    selected_device.get("address"),
+                )
                 self.context["selected_ble_device"] = selected_device
                 return await self.async_step_identify_grid_connect_uuid()
             else:
@@ -177,14 +192,25 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Identify the Grid Connect UUID from the selected device's service UUIDs."""
         selected_device = self.context.get("selected_ble_device")
 
-        if not selected_device or "service_uuids" not in selected_device:
-            _LOGGER.error("Selected BLE device or its service UUIDs not found in context.")
+        if not selected_device:
+            _LOGGER.error("Selected BLE device not found in context.")
             return await self.async_step_manual()
+
+        service_uuids = selected_device.get("service_uuids", [])
+        if not service_uuids:
+            # Many low-cost plugs do not expose custom service UUIDs in advertisements.
+            _LOGGER.info(
+                "No advertised service UUIDs for %s; using default Grid Connect UUID %s",
+                selected_device.get("address"),
+                GRID_CONNECT_SERVICE_UUID,
+            )
+            self.context["grid_connect_uuid"] = GRID_CONNECT_SERVICE_UUID
+            return await self.async_step_wifi_credentials()
 
         # Heuristic to find a non-standard, custom UUID that is likely the Grid Connect service.
         # This is a basic approach and might need refinement based on actual device behavior.
         grid_connect_uuid: str | None = None
-        for uuid in selected_device["service_uuids"]:
+        for uuid in service_uuids:
             # Exclude obvious standard 16-bit-based UUIDs; treat others as custom candidates.
             if uuid.startswith("0000") and len(uuid) > 8:
                 # Placeholder for more detailed filtering if needed.
@@ -199,6 +225,13 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 grid_connect_uuid,
                 selected_device["address"],
             )
+            detected_model = _detect_model_from_name(selected_device.get("name"))
+            if detected_model:
+                _LOGGER.info(
+                    "Detected model %s from device name '%s'",
+                    detected_model,
+                    selected_device.get("name"),
+                )
             self.context["grid_connect_uuid"] = grid_connect_uuid
             return await self.async_step_wifi_credentials()
 
@@ -289,6 +322,11 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             ssid = user_input["ssid"]
             password = user_input["password"]
+            _LOGGER.info(
+                "Attempting BLE Wi-Fi provisioning for %s on SSID '%s'",
+                selected_device.get("address"),
+                ssid,
+            )
 
             # Attempt to send Wi-Fi credentials over BLE
             result = await send_wifi_credentials(
@@ -297,6 +335,11 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             if result is None:
                 detected_model = _detect_model_from_name(selected_device.get("name"))
+                _LOGGER.info(
+                    "Wi-Fi provisioning succeeded for %s (model=%s)",
+                    selected_device.get("address"),
+                    detected_model or user_input.get(CONF_MODEL),
+                )
                 # Success - create the config entry
                 return self.async_create_entry(
                     title=selected_device.get("name") or "Grid Connect Device",
