@@ -90,6 +90,7 @@ jobs:
       tests_glob: ${{ steps.info.outputs.tests_glob }}
       tests: ${{ steps.info.outputs.tests }}
       lint_only: ${{ steps.info.outputs.lint_only }}
+      core_layout: ${{ steps.info.outputs.core_layout }}
       skip_coverage: ${{ steps.info.outputs.skip_coverage }}
     runs-on: ubuntu-24.04
     steps:
@@ -144,7 +145,13 @@ jobs:
           tests="[]"
           tests_glob=""
           lint_only=""
+          core_layout="false"
           skip_coverage=""
+
+          if [[ -d "homeassistant" && -d "script" && -d "tests" && -f "requirements.txt" ]];
+          then
+            core_layout="true"
+          fi
 
           if [[ "${{ steps.integrations.outputs.changes }}" != "[]" ]];
           then
@@ -232,6 +239,8 @@ jobs:
           echo "tests_glob=${tests_glob}" >> $GITHUB_OUTPUT
           echo "lint_only": ${lint_only}
           echo "lint_only=${lint_only}" >> $GITHUB_OUTPUT
+          echo "core_layout: ${core_layout}"
+          echo "core_layout=${core_layout}" >> $GITHUB_OUTPUT
           echo "skip_coverage: ${skip_coverage}"
           echo "skip_coverage=${skip_coverage}" >> $GITHUB_OUTPUT
 
@@ -267,8 +276,8 @@ jobs:
           python -m venv venv
           . venv/bin/activate
           python --version
-          pip install "$(grep '^uv' < requirements.txt)"
-          uv pip install "$(cat requirements_test.txt | grep pre-commit)"
+          pip install uv
+          uv pip install -r requirements_test_pre_commit.txt
       - name: Restore pre-commit environment from cache
         id: cache-precommit
         uses: actions/cache@v4.2.3
@@ -459,7 +468,6 @@ jobs:
         file:
           - Dockerfile
           - Dockerfile.dev
-          - script/hassfest/docker/Dockerfile
     steps:
       - name: Check out code from GitHub
         uses: actions/checkout@v4.2.2
@@ -474,6 +482,7 @@ jobs:
   base:
     name: Prepare dependencies
     runs-on: ubuntu-24.04
+    if: needs.info.outputs.core_layout == 'true'
     needs: info
     timeout-minutes: 60
     strategy:
