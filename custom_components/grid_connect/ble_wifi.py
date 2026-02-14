@@ -10,8 +10,7 @@ _BleakClient: type[Any] | None
 _BleakError: type[BaseException] | None
 
 try:
-    from bleak import BleakClient as _BleakClient
-    from bleak import BleakError as _BleakError
+    from bleak import BleakClient as _BleakClient, BleakError as _BleakError
 except ImportError:  # pragma: no cover - runtime dependency
     _BleakClient = None
     _BleakError = None
