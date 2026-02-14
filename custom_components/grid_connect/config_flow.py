@@ -12,6 +12,7 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.components import bluetooth
 from homeassistant.core import callback
 
 from .const import DOMAIN
@@ -41,7 +42,6 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_ble_scan(self, user_input=None) -> config_entries.ConfigFlowResult:
         """Scan for Grid Connect devices via BLE and present selection."""
-        errors = {}
         # We'll scan for 10 seconds and collect all BLE devices
         devices = []
         seen_addresses = set()
@@ -50,11 +50,20 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         try:
             while time.monotonic() - start_time < scan_duration:
-                # Use Home Assistant's bluetooth.async_discovered_service_info to get BLE advertisements
-                for service_info in self.hass.data.get("bluetooth", {}).get("discovered_service_info", []):
+                # Use Home Assistant's bluetooth API to get discovered advertisements.
+                try:
+                    discovered = bluetooth.async_discovered_service_info(
+                        self.hass, connectable=True
+                    )
+                except TypeError:
+                    # Backward compatibility with older signatures.
+                    discovered = bluetooth.async_discovered_service_info(self.hass)
+
+                for service_info in discovered:
                     # Collect all devices that have service_uuids and haven't been seen yet
                     if (
                         hasattr(service_info, "service_uuids")
+                        and service_info.service_uuids
                         and service_info.address not in seen_addresses
                     ):
                         devices.append({
@@ -289,8 +298,8 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "bleak_not_installed"
             elif result == "not_connected":
                 errors["base"] = "ble_not_connected"
-            elif result == "bleak_import_error":
-                errors["base"] = "ble_import_error"
+            elif result == "ble_error":
+                errors["base"] = "ble_error"
             elif result == "timeout":
                 errors["base"] = "ble_timeout"
             else:

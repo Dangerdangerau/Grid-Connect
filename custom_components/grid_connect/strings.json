@@ -2,15 +2,15 @@
   "config": {
     "step": {
       "user": {
+        "title": "Add Grid Connect device",
+        "description": "Scan for nearby BLE devices or enter one manually.",
         "data": {
-          "host": "[%key:common::config_flow::data::host%]",
-          "username": "[%key:common::config_flow::data::username%]",
-          "password": "[%key:common::config_flow::data::password%]"
+          "action": "Setup method"
         }
       },
       "no_devices_found": {
         "title": "No devices found",
-        "description": "Is your device in pairing mode?",
+        "description": "No BLE devices were discovered. Is your device in pairing mode?",
         "data": {
           "action": "Choose an action"
         }
@@ -23,15 +23,46 @@
           "grid_connect_uuid": "Grid Connect UUID (BLE service UUID)",
           "device_address": "BLE MAC address"
         }
+      },
+      "select_ble_device": {
+        "title": "Select BLE device",
+        "description": "Choose the BLE device to provision.",
+        "data": {
+          "selected_device": "Discovered devices"
+        }
+      },
+      "select_fallback_uuid": {
+        "title": "Select service UUID",
+        "description": "Automatic UUID detection failed. Select the service UUID manually.",
+        "data": {
+          "action": "Action",
+          "selected_uuid": "Service UUID"
+        }
+      },
+      "wifi_credentials": {
+        "title": "Wi-Fi credentials",
+        "description": "Enter the Wi-Fi credentials to send to the device over BLE.",
+        "data": {
+          "ssid": "Wi-Fi SSID",
+          "password": "Wi-Fi password"
+        }
       }
     },
     "error": {
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error",
+      "no_devices_for_selection": "No discovered devices available.",
+      "device_not_found": "Selected device is no longer available.",
+      "no_uuid_selected": "Select a service UUID to continue.",
+      "bleak_not_installed": "Bluetooth dependency (bleak) is not installed.",
+      "ble_not_connected": "Failed to connect to the BLE device.",
+      "ble_error": "BLE communication failed while provisioning.",
+      "ble_timeout": "BLE operation timed out.",
+      "ble_unknown_error": "Unknown BLE provisioning error."
     },
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+      "already_configured": "Device is already configured"
     }
   }
 }
