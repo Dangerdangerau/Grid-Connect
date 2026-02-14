@@ -8,6 +8,7 @@ import asyncio
 import logging
 import time
 from typing import Any
+from uuid import UUID
 
 import voluptuous as vol
 
@@ -66,7 +67,23 @@ def _is_likely_grid_connect_device(service_info: Any) -> bool:
     if GRID_CONNECT_SERVICE_UUID.lower() in service_uuids:
         return True
 
+    for candidate_name in (adv_name, device_name):
+        try:
+            UUID(candidate_name)
+            return True
+        except (ValueError, TypeError):
+            continue
+
     return False
+
+
+def _is_uuid_like_name(name: str) -> bool:
+    """Return True if a BLE name is a UUID-like identifier."""
+    try:
+        UUID(name)
+    except (ValueError, TypeError):
+        return False
+    return True
 
 
 class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -127,7 +144,11 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ):
                         devices.append({
                             "id": service_info.address,
-                            "name": service_info.name or "Unnamed BLE Device",
+                            "name": (
+                                "Grid Connect BLE Device"
+                                if _is_uuid_like_name(service_info.name or "")
+                                else service_info.name or "Unnamed BLE Device"
+                            ),
                             "address": service_info.address,
                             "service_uuids": list(getattr(service_info, "service_uuids", []) or []),
                         })
