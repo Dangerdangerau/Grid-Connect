@@ -29,6 +29,8 @@ _GRID_CONNECT_NAME_HINTS: tuple[str, ...] = (
     "GRID CONNECT",
     "ARLEC",
     "SMART PLUG",
+    "SG120HA",
+    "SG120",
     MODEL_PC191HA,
     MODEL_PC191BKHA,
 )
@@ -51,7 +53,9 @@ def _detect_model_from_name(device_name: str | None) -> str | None:
 
 def _is_likely_grid_connect_device(service_info: Any) -> bool:
     """Return True when BLE advertisement looks like a Grid Connect plug."""
-    name = str(getattr(service_info, "name", "") or "").upper()
+    adv_name = str(getattr(service_info, "name", "") or "")
+    device_name = str(getattr(getattr(service_info, "device", None), "name", "") or "")
+    name = f"{adv_name} {device_name}".upper()
     if any(hint in name for hint in _GRID_CONNECT_NAME_HINTS):
         return True
 
