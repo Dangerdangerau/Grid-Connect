@@ -16,7 +16,7 @@ from homeassistant.exceptions import (
 from .api import AuthenticationError
 from .bluetooth import discover_bluetooth_devices
 from .coordinator import GridConnectDataUpdateCoordinator
-from .const import DOMAIN
+from .const import CONF_MODEL, DOMAIN
 from .local_api import GridConnectAPI
 
 _LOGGER = logging.getLogger(__name__)  # Set up the logger
@@ -32,7 +32,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
 # Define the platforms that this integration supports
-_PLATFORMS: list[Platform] = [Platform.EVENT, Platform.BINARY_SENSOR]
+_PLATFORMS: list[Platform] = [
+    Platform.EVENT,
+    Platform.BINARY_SENSOR,
+    Platform.SWITCH,
+    Platform.SENSOR,
+]
 
 # Type alias for better readability
 type GridConnectConfigEntry = ConfigEntry
@@ -58,6 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GridConnectConfigEntry) 
                 host=entry.data.get("host") or entry.data.get("device_address", ""),
                 username=entry.data.get("username", ""),
                 password=entry.data.get("password", ""),
+                model=entry.data.get(CONF_MODEL),
             )
             coordinator = GridConnectDataUpdateCoordinator(hass, api_client)
             await coordinator.async_config_entry_first_refresh()

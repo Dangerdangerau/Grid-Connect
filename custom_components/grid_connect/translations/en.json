@@ -37,7 +37,8 @@
         "data": {
           "device_name": "Device name",
           "grid_connect_uuid": "Grid Connect UUID (BLE service UUID)",
-          "device_address": "BLE MAC address"
+          "device_address": "BLE MAC address",
+          "model": "Device model (optional)"
         }
       },
       "select_ble_device": {
@@ -60,7 +61,8 @@
         "description": "Enter the Wi-Fi credentials to send to the device over BLE.",
         "data": {
           "ssid": "Wi-Fi SSID",
-          "password": "Wi-Fi password"
+          "password": "Wi-Fi password",
+          "model": "Device model (optional)"
         }
       }
     }

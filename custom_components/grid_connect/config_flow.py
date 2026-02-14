@@ -15,10 +15,25 @@ from homeassistant import config_entries
 from homeassistant.components import bluetooth
 from homeassistant.core import callback
 
-from .const import DOMAIN
+from .const import CONF_MODEL, DOMAIN, MODEL_PC191BKHA, MODEL_PC191HA
 from .ble_wifi import send_wifi_credentials
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _detect_model_from_name(device_name: str | None) -> str | None:
+    """Infer known model from BLE name."""
+    if not device_name:
+        return None
+    normalized = device_name.upper()
+    if MODEL_PC191BKHA in normalized:
+        return MODEL_PC191BKHA
+    if MODEL_PC191HA in normalized:
+        return MODEL_PC191HA
+    if "SMART PLUG" in normalized:
+        # Bunnings listing references the white variant (PC191HA).
+        return MODEL_PC191HA
+    return None
 
 
 class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -281,6 +296,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
             if result is None:
+                detected_model = _detect_model_from_name(selected_device.get("name"))
                 # Success - create the config entry
                 return self.async_create_entry(
                     title=selected_device.get("name") or "Grid Connect Device",
@@ -289,6 +305,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         "grid_connect_uuid": grid_connect_uuid,
                         "device_name": selected_device.get("name") or "Grid Connect Device",
                         "wifi_ssid": ssid,
+                        CONF_MODEL: detected_model or user_input.get(CONF_MODEL),
                     },
                 )
 
@@ -305,12 +322,28 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 errors["base"] = "ble_unknown_error"
 
+        suggested_model = (
+            _detect_model_from_name(selected_device.get("name"))
+            or self.context.get(CONF_MODEL)
+        )
+        model_field: Any
+        if suggested_model in {MODEL_PC191HA, MODEL_PC191BKHA}:
+            model_field = vol.Optional(CONF_MODEL, default=suggested_model)
+        else:
+            model_field = vol.Optional(CONF_MODEL)
+
         return self.async_show_form(
             step_id="wifi_credentials",
             data_schema=vol.Schema(
                 {
                     vol.Required("ssid"): str,
                     vol.Required("password"): str,
+                    model_field: vol.In(
+                        {
+                            MODEL_PC191HA: "Arlec Smart Plug + Energy (PC191HA)",
+                            MODEL_PC191BKHA: "Arlec Smart Plug + Energy (PC191BKHA)",
+                        }
+                    ),
                 }
             ),
             errors=errors,
@@ -326,6 +359,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "name": user_input["device_name"],
             }
             self.context["grid_connect_uuid"] = user_input["grid_connect_uuid"]
+            self.context[CONF_MODEL] = user_input.get(CONF_MODEL)
             _LOGGER.info(
                 "Manual entry: device %s with UUID %s, proceeding to Wi-Fi provisioning",
                 user_input["device_name"],
@@ -338,6 +372,12 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required("device_name"): str,
                 vol.Required("grid_connect_uuid"): str,
                 vol.Required("device_address"): str,
+                vol.Optional(CONF_MODEL): vol.In(
+                    {
+                        MODEL_PC191HA: "Arlec Smart Plug + Energy (PC191HA)",
+                        MODEL_PC191BKHA: "Arlec Smart Plug + Energy (PC191BKHA)",
+                    }
+                ),
             }),
             errors=errors,
         )
