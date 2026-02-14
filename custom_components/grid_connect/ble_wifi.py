@@ -6,6 +6,16 @@ import logging
 from inspect import isawaitable
 from typing import Any
 
+_BleakClient: type[Any] | None
+_BleakError: type[BaseException] | None
+
+try:
+    from bleak import BleakClient as _BleakClient
+    from bleak import BleakError as _BleakError
+except ImportError:  # pragma: no cover - runtime dependency
+    _BleakClient = None
+    _BleakError = None
+
 _LOGGER = logging.getLogger(__name__)
 
 # Placeholder UUIDs - replace with actual Grid Connect service/characteristic UUIDs.
@@ -16,6 +26,13 @@ WIFI_WRITE_CHAR_UUID = "0000fd89-0000-1000-8000-00805f9b34fb"
 def format_wifi_payload(ssid: str, password: str) -> bytes:
     """Format credential payload expected by the device firmware."""
     return f"{ssid},{password}".encode()
+
+
+def _get_bleak_client_class() -> type[Any]:
+    """Return BleakClient class when available."""
+    if _BleakClient is None:
+        raise RuntimeError("bleak_not_installed")
+    return _BleakClient
 
 
 async def _is_client_connected(client: Any) -> bool:
@@ -32,12 +49,11 @@ async def send_wifi_credentials(
     address: str, ssid: str, password: str, timeout: int = 15
 ) -> str | None:
     """Send Wi-Fi credentials over BLE. Return None on success, error code on failure."""
-    try:
-        from bleak import BleakClient as bleak_client
-        from bleak import BleakError as bleak_error
-    except ImportError:  # pragma: no cover - runtime dependency
+    if _BleakClient is None:
         return "bleak_not_installed"
 
+    bleak_client = _get_bleak_client_class()
+    bleak_error = _BleakError
     payload = format_wifi_payload(ssid, password)
 
     try:
@@ -53,9 +69,9 @@ async def send_wifi_credentials(
     except TimeoutError:
         _LOGGER.exception("BLE operation timed out while provisioning %s", address)
         return "timeout"
-    except bleak_error:
-        _LOGGER.exception("BLE transport/protocol error while provisioning %s", address)
-        return "ble_error"
-    except Exception:
+    except Exception as err:
+        if bleak_error is not None and isinstance(err, bleak_error):
+            _LOGGER.exception("BLE transport/protocol error while provisioning %s", address)
+            return "ble_error"
         _LOGGER.exception("Unexpected BLE Wi-Fi credential send error for %s", address)
         return "ble_unknown_error"
