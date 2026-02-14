@@ -70,9 +70,10 @@ def _is_likely_grid_connect_device(service_info: Any) -> bool:
     for candidate_name in (adv_name, device_name):
         try:
             UUID(candidate_name)
-            return True
         except (ValueError, TypeError):
             continue
+        else:
+            return True
 
     return False
 
