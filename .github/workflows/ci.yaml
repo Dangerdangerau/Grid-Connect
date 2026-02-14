@@ -118,10 +118,10 @@ jobs:
           filters: .core_files.yaml
       - name: Create a list of integrations to filter for changes
         run: |
-          integrations=$(ls -Ad ./homeassistant/components/[!_]*  | xargs -n 1 basename)
+          integrations=$(find ./custom_components -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
           touch .integration_paths.yaml
           for integration in $integrations; do
-            echo "${integration}: [homeassistant/components/${integration}/**, tests/components/${integration}/**]" \
+            echo "${integration}: [custom_components/${integration}/**]" \
               >> .integration_paths.yaml;
           done
           echo "Result:"
@@ -426,7 +426,7 @@ jobs:
         run: |
           . venv/bin/activate
           shopt -s globstar
-          pre-commit run --hook-stage manual prettier --files {homeassistant,tests}/components/${{ needs.info.outputs.integrations_glob }}/{*,**/*}
+          pre-commit run --hook-stage manual prettier --files custom_components/${{ needs.info.outputs.integrations_glob }}/{*,**/*}
 
       - name: Register check executables problem matcher
         run: |
@@ -741,14 +741,14 @@ jobs:
         run: |
           . venv/bin/activate
           python --version
-          pylint --ignore-missing-annotations=y homeassistant
+          pylint --ignore-missing-annotations=y custom_components
       - name: Run pylint (partially)
         if: needs.info.outputs.test_full_suite == 'false'
         shell: bash
         run: |
           . venv/bin/activate
           python --version
-          pylint --ignore-missing-annotations=y homeassistant/components/${{ needs.info.outputs.integrations_glob }}
+          pylint --ignore-missing-annotations=y custom_components/${{ needs.info.outputs.integrations_glob }}
 
   pylint-tests:
     name: Check pylint on tests
@@ -851,14 +851,14 @@ jobs:
         run: |
           . venv/bin/activate
           python --version
-          mypy homeassistant pylint
+          mypy custom_components
       - name: Run mypy (partially)
         if: needs.info.outputs.test_full_suite == 'false'
         shell: bash
         run: |
           . venv/bin/activate
           python --version
-          mypy homeassistant/components/${{ needs.info.outputs.integrations_glob }}
+          mypy custom_components/${{ needs.info.outputs.integrations_glob }}
 
   prepare-pytest-full:
     runs-on: ubuntu-24.04
