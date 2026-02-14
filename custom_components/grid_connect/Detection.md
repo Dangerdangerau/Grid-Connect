@@ -67,7 +67,7 @@ Expected Wi-Fi protection on the air interface:
 - If router is open/weakly configured, radio traffic protection is reduced.
 
 Important distinction:
-- Wi-Fi encryption protects device<->router radio frames after Wi-Fi join.
+- Wi-Fi encryption protects device↔router radio frames after Wi-Fi join.
 - It does not automatically secure how credentials are handled before join.
 
 ## 7. BLE security details during credential provisioning
