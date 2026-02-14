@@ -6,6 +6,7 @@ set up and manage their integration settings.
 
 import asyncio
 import logging
+import re
 import time
 from typing import Any
 from uuid import UUID
@@ -37,6 +38,24 @@ _GRID_CONNECT_NAME_HINTS: tuple[str, ...] = (
 )
 
 
+def _is_identifier_like_name(name: str) -> bool:
+    """Return True for UUID-like or long hex BLE names used by some plugs."""
+    value = name.strip()
+    if not value:
+        return False
+    try:
+        UUID(value)
+        return True
+    except (ValueError, TypeError):
+        pass
+
+    compact = value.replace("-", "")
+    if len(compact) >= 12 and re.fullmatch(r"[0-9A-Fa-f]+", compact):
+        return True
+
+    return False
+
+
 def _detect_model_from_name(device_name: str | None) -> str | None:
     """Infer known model from BLE name."""
     if not device_name:
@@ -54,10 +73,13 @@ def _detect_model_from_name(device_name: str | None) -> str | None:
 
 def _is_likely_grid_connect_device(service_info: Any) -> bool:
     """Return True when BLE advertisement looks like a Grid Connect plug."""
-    adv_name = str(getattr(service_info, "name", "") or "")
-    device_name = str(getattr(getattr(service_info, "device", None), "name", "") or "")
-    name = f"{adv_name} {device_name}".upper()
-    if any(hint in name for hint in _GRID_CONNECT_NAME_HINTS):
+    candidate_names = [
+        str(getattr(service_info, "name", "") or ""),
+        str(getattr(service_info, "local_name", "") or ""),
+        str(getattr(getattr(service_info, "device", None), "name", "") or ""),
+    ]
+    combined_name = " ".join(candidate_names).upper()
+    if any(hint in combined_name for hint in _GRID_CONNECT_NAME_HINTS):
         return True
 
     service_uuids = [
@@ -67,24 +89,31 @@ def _is_likely_grid_connect_device(service_info: Any) -> bool:
     if GRID_CONNECT_SERVICE_UUID.lower() in service_uuids:
         return True
 
-    for candidate_name in (adv_name, device_name):
-        try:
-            UUID(candidate_name)
-        except (ValueError, TypeError):
-            continue
-        else:
-            return True
+    if any(_is_identifier_like_name(name) for name in candidate_names):
+        return True
+
+    if any(
+        uuid.startswith("0000fd") and uuid.endswith("00805f9b34fb")
+        for uuid in service_uuids
+    ):
+        return True
 
     return False
 
 
-def _is_uuid_like_name(name: str) -> bool:
-    """Return True if a BLE name is a UUID-like identifier."""
-    try:
-        UUID(name)
-    except (ValueError, TypeError):
-        return False
-    return True
+def _friendly_ble_name(service_info: Any) -> str:
+    """Build a user-friendly BLE name for selection lists."""
+    for name in (
+        str(getattr(service_info, "name", "") or ""),
+        str(getattr(service_info, "local_name", "") or ""),
+        str(getattr(getattr(service_info, "device", None), "name", "") or ""),
+    ):
+        if not name:
+            continue
+        if _is_identifier_like_name(name):
+            return "Grid Connect BLE Device"
+        return name
+    return "Unnamed BLE Device"
 
 
 class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -145,11 +174,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ):
                         devices.append({
                             "id": service_info.address,
-                            "name": (
-                                "Grid Connect BLE Device"
-                                if _is_uuid_like_name(service_info.name or "")
-                                else service_info.name or "Unnamed BLE Device"
-                            ),
+                            "name": _friendly_ble_name(service_info),
                             "address": service_info.address,
                             "service_uuids": list(getattr(service_info, "service_uuids", []) or []),
                         })
