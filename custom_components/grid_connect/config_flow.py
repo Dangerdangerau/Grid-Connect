@@ -93,10 +93,8 @@ def _is_likely_grid_connect_device(service_info: Any) -> bool:
     if any(_is_identifier_like_name(name) for name in candidate_names):
         return True
 
-    if any(
-        uuid.startswith("0000fd") and uuid.endswith("00805f9b34fb")
-        for uuid in service_uuids
-    ):
+    manufacturer_data = getattr(service_info, "manufacturer_data", {}) or {}
+    if 0x07D0 in manufacturer_data or 2000 in manufacturer_data:
         return True
 
     return False
