@@ -11,14 +11,25 @@ from typing import Any
 
 import voluptuous as vol
 
+# noinspection PyUnresolvedReferences
 from homeassistant import config_entries
+# noinspection PyUnresolvedReferences
 from homeassistant.components import bluetooth
+# noinspection PyUnresolvedReferences
 from homeassistant.core import callback
 
 from .ble_wifi import GRID_CONNECT_SERVICE_UUID, send_wifi_credentials
 from .const import CONF_MODEL, DOMAIN, MODEL_PC191BKHA, MODEL_PC191HA
 
 _LOGGER = logging.getLogger(__name__)
+
+_GRID_CONNECT_NAME_HINTS: tuple[str, ...] = (
+    "GRID CONNECT",
+    "ARLEC",
+    "SMART PLUG",
+    MODEL_PC191HA,
+    MODEL_PC191BKHA,
+)
 
 
 def _detect_model_from_name(device_name: str | None) -> str | None:
@@ -34,6 +45,22 @@ def _detect_model_from_name(device_name: str | None) -> str | None:
         # Bunnings listing references the white variant (PC191HA).
         return MODEL_PC191HA
     return None
+
+
+def _is_likely_grid_connect_device(service_info: Any) -> bool:
+    """Return True when BLE advertisement looks like a Grid Connect plug."""
+    name = str(getattr(service_info, "name", "") or "").upper()
+    if any(hint in name for hint in _GRID_CONNECT_NAME_HINTS):
+        return True
+
+    service_uuids = [
+        str(uuid).lower()
+        for uuid in (getattr(service_info, "service_uuids", []) or [])
+    ]
+    if GRID_CONNECT_SERVICE_UUID.lower() in service_uuids:
+        return True
+
+    return False
 
 
 class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -84,6 +111,8 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     discovered_non_connectable = []
 
                 for service_info in [*discovered, *discovered_non_connectable]:
+                    if not _is_likely_grid_connect_device(service_info):
+                        continue
                     # Collect all BLE devices by address; UUIDs may be absent in advertisements.
                     if (
                         hasattr(service_info, "address")
