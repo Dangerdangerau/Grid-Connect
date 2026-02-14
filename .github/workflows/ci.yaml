@@ -291,7 +291,12 @@ jobs:
         if: steps.cache-precommit.outputs.cache-hit != 'true'
         run: |
           . venv/bin/activate
+          uv pip install -r requirements_test_pre_commit.txt
           pre-commit install-hooks
+      - name: Ensure pre-commit CLI is installed
+        run: |
+          . venv/bin/activate
+          uv pip install -r requirements_test_pre_commit.txt
 
   lint-ruff-format:
     name: Check ruff-format
@@ -326,6 +331,10 @@ jobs:
           key: >-
             ${{ runner.os }}-${{ runner.arch }}-${{ steps.python.outputs.python-version }}-${{
               needs.info.outputs.pre-commit_cache_key }}
+      - name: Ensure pre-commit CLI is installed
+        run: |
+          . venv/bin/activate
+          uv pip install -r requirements_test_pre_commit.txt
       - name: Run ruff-format
         run: |
           . venv/bin/activate
@@ -366,6 +375,10 @@ jobs:
           key: >-
             ${{ runner.os }}-${{ runner.arch }}-${{ steps.python.outputs.python-version }}-${{
               needs.info.outputs.pre-commit_cache_key }}
+      - name: Ensure pre-commit CLI is installed
+        run: |
+          . venv/bin/activate
+          uv pip install -r requirements_test_pre_commit.txt
       - name: Run ruff
         run: |
           . venv/bin/activate
@@ -406,6 +419,10 @@ jobs:
           key: >-
             ${{ runner.os }}-${{ runner.arch }}-${{ steps.python.outputs.python-version }}-${{
               needs.info.outputs.pre-commit_cache_key }}
+      - name: Ensure pre-commit CLI is installed
+        run: |
+          . venv/bin/activate
+          uv pip install -r requirements_test_pre_commit.txt
 
       - name: Register yamllint problem matcher
         run: |
