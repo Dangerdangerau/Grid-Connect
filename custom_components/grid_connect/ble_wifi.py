@@ -3,12 +3,8 @@
 from __future__ import annotations
 
 import logging
-
-try:
-    from bleak import BleakClient, BleakError
-except ImportError:  # pragma: no cover - runtime dependency
-    BleakClient = None  # type: ignore[assignment]
-    BleakError = Exception  # type: ignore[assignment]
+from inspect import isawaitable
+from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,15 +15,15 @@ WIFI_WRITE_CHAR_UUID = "0000fd89-0000-1000-8000-00805f9b34fb"
 
 def format_wifi_payload(ssid: str, password: str) -> bytes:
     """Format credential payload expected by the device firmware."""
-    return f"{ssid},{password}".encode("utf-8")
+    return f"{ssid},{password}".encode()
 
 
-async def _is_client_connected(client: BleakClient) -> bool:
+async def _is_client_connected(client: Any) -> bool:
     """Get connection state across bleak versions."""
     connected = getattr(client, "is_connected", False)
     if callable(connected):
         connected = connected()
-        if hasattr(connected, "__await__"):
+        if isawaitable(connected):
             connected = await connected
     return bool(connected)
 
@@ -36,13 +32,16 @@ async def send_wifi_credentials(
     address: str, ssid: str, password: str, timeout: int = 15
 ) -> str | None:
     """Send Wi-Fi credentials over BLE. Return None on success, error code on failure."""
-    if BleakClient is None:
+    try:
+        from bleak import BleakClient as bleak_client
+        from bleak import BleakError as bleak_error
+    except ImportError:  # pragma: no cover - runtime dependency
         return "bleak_not_installed"
 
     payload = format_wifi_payload(ssid, password)
 
     try:
-        async with BleakClient(address, timeout=timeout) as client:
+        async with bleak_client(address, timeout=timeout) as client:
             if not await _is_client_connected(client):
                 await client.connect(timeout=timeout)
 
@@ -54,7 +53,7 @@ async def send_wifi_credentials(
     except TimeoutError:
         _LOGGER.exception("BLE operation timed out while provisioning %s", address)
         return "timeout"
-    except BleakError:
+    except bleak_error:
         _LOGGER.exception("BLE transport/protocol error while provisioning %s", address)
         return "ble_error"
     except Exception:

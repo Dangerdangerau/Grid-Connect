@@ -15,8 +15,8 @@ from homeassistant.exceptions import (
 
 from .api import AuthenticationError
 from .bluetooth import discover_bluetooth_devices
-from .coordinator import GridConnectDataUpdateCoordinator
 from .const import CONF_MODEL, DOMAIN
+from .coordinator import GridConnectDataUpdateCoordinator
 from .local_api import GridConnectAPI
 
 _LOGGER = logging.getLogger(__name__)  # Set up the logger
@@ -40,7 +40,7 @@ _PLATFORMS: list[Platform] = [
 ]
 
 # Type alias for better readability
-type GridConnectConfigEntry = ConfigEntry
+GridConnectConfigEntry = ConfigEntry
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: GridConnectConfigEntry) -> bool:
@@ -91,8 +91,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: GridConnectConfigEntry) 
         raise ConfigEntryNotReady("Could not connect to the device") from err
     except Exception as err:
         raise ConfigEntryError(f"Unexpected error: {err}") from err
-
-    return False
 
 
 async def async_unload_entry(

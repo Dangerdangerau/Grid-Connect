@@ -19,15 +19,17 @@ COPY rootfs /
 ARG BUILD_ARCH
 # Get go2rtc binary
 RUN \
+    go2rtc_suffix="${BUILD_ARCH}" \
+    && \
     case "${BUILD_ARCH}" in \
         "aarch64") go2rtc_suffix='arm64' ;; \
         "armhf") go2rtc_suffix='armv6' ;; \
         "armv7") go2rtc_suffix='arm' ;; \
-        *) go2rtc_suffix=${BUILD_ARCH} ;; \
+        *) ;; \
     esac \
     && curl -L https://github.com/AlexxIT/go2rtc/releases/download/v1.9.9/go2rtc_linux_${go2rtc_suffix} --output /bin/go2rtc \
     && chmod +x /bin/go2rtc \
-    # Verify go2rtc can be executed
+    # Verify go2rtc can be executed \
     && go2rtc --version
 
 # Install uv

@@ -15,8 +15,8 @@ from homeassistant import config_entries
 from homeassistant.components import bluetooth
 from homeassistant.core import callback
 
-from .const import CONF_MODEL, DOMAIN, MODEL_PC191BKHA, MODEL_PC191HA
 from .ble_wifi import GRID_CONNECT_SERVICE_UUID, send_wifi_credentials
+from .const import CONF_MODEL, DOMAIN, MODEL_PC191BKHA, MODEL_PC191HA
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if action == "scan_again":
                 _LOGGER.info("User chose to scan again from no devices found step.")
                 return await self.async_step_ble_scan()
-            elif action == "manual":
+            if action == "manual":
                 _LOGGER.info("User chose manual entry from no devices found step.")
                 return await self.async_step_manual()
 
@@ -173,8 +173,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
                 self.context["selected_ble_device"] = selected_device
                 return await self.async_step_identify_grid_connect_uuid()
-            else:
-                errors["base"] = "device_not_found"
+            errors["base"] = "device_not_found"
 
         return self.async_show_form(
             step_id="select_ble_device",

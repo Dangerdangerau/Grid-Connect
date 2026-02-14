@@ -16,6 +16,7 @@ class GridConnectAPI:
 
     async def authenticate(self) -> bool:
         """Authenticate with the Grid Connect API."""
+        _ = self.host  # Keep as instance method; real auth will use connection details.
         # Implement your authentication logic here
         return True  # Return True if authentication is successful
 

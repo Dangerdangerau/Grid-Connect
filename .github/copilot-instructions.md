@@ -1,4 +1,5 @@
 # GitHub Copilot & Claude Code Instructions
+<!--suppress ALL -->
 
 This repository contains the core of Home Assistant, a Python 3 based home automation application.
 
@@ -58,7 +59,7 @@ rules:
 ### Strict Typing (Platinum)
 - **Comprehensive Type Hints**: Add type hints to all functions, methods, and variables
 - **Custom Config Entry Types**: When using runtime_data:
-  ```python
+  ```text
   type MyIntegrationConfigEntry = ConfigEntry[MyClient]
   ```
 - **Library Requirements**: Include `py.typed` file for PEP-561 compliance
@@ -94,7 +95,7 @@ rules:
 
 ### Common Modules
 - **coordinator.py**: Centralize data fetching logic
-  ```python
+  ```text
   class MyCoordinator(DataUpdateCoordinator[MyData]):
       def __init__(self, hass: HomeAssistant, client: MyClient, config_entry: ConfigEntry) -> None:
           super().__init__(
@@ -106,14 +107,14 @@ rules:
           )
   ```
 - **entity.py**: Base entity definitions to reduce duplication
-  ```python
+  ```text
   class MyEntity(CoordinatorEntity[MyCoordinator]):
       _attr_has_entity_name = True
   ```
 
 ### Runtime Data Storage
 - **Use ConfigEntry.runtime_data**: Store non-persistent runtime data
-  ```python
+  ```text
   type MyIntegrationConfigEntry = ConfigEntry[MyClient]
   
   async def async_setup_entry(hass: HomeAssistant, entry: MyIntegrationConfigEntry) -> bool:
@@ -131,7 +132,7 @@ rules:
 ### Config Flow Patterns
 - **Version Control**: Always set `VERSION = 1` and `MINOR_VERSION = 1`
 - **Unique ID Management**:
-  ```python
+  ```text
   await self.async_set_unique_id(device_unique_id)
   self._abort_if_unique_id_configured()
   ```
@@ -150,11 +151,11 @@ rules:
 
 ### Documentation Standards
 - **File Headers**: Short and concise
-  ```python
+  ```text
   """Integration for Peblar EV chargers."""
   ```
 - **Method/Function Docstrings**: Required for all
-  ```python
+  ```text
   async def async_setup_entry(hass: HomeAssistant, entry: PeblarConfigEntry) -> bool:
       """Set up Peblar from a config entry."""
   ```
@@ -179,7 +180,7 @@ rules:
 
 ### WebSession Injection (Platinum)
 - **Pass WebSession**: Support passing web sessions to dependencies
-  ```python
+  ```text
   async def async_setup_entry(hass: HomeAssistant, entry: MyConfigEntry) -> bool:
       """Set up integration from config entry."""
       client = MyClient(entry.data[CONF_HOST], async_get_clientsession(hass))
@@ -188,7 +189,7 @@ rules:
 
 ### Blocking Operations
 - **Use Executor**: For blocking I/O operations
-  ```python
+  ```text
   result = await hass.async_add_executor_job(blocking_function, args)
   ```
 - **Never Block Event Loop**: Avoid file operations, `time.sleep()`, blocking HTTP calls
@@ -196,7 +197,7 @@ rules:
 
 ### Thread Safety
 - **@callback Decorator**: For event loop safe functions
-  ```python
+  ```text
   @callback
   def async_update_callback(self, event):
       """Safe to run in event loop."""
@@ -207,7 +208,7 @@ rules:
 
 ### Data Update Coordinator
 - **Standard Pattern**: Use for efficient data management
-  ```python
+  ```text
   class MyCoordinator(DataUpdateCoordinator):
       def __init__(self, hass: HomeAssistant, client: MyClient, config_entry: ConfigEntry) -> None:
           super().__init__(
@@ -242,14 +243,14 @@ rules:
   - Names are automatically generated or can be customized later in UI
   - ✅ Exception: Helper integrations MAY allow custom names in config flow
 - **Connection Testing**: Test device/service connection during config flow:
-  ```python
+  ```text
   try:
       await client.get_data()
   except MyException:
       errors["base"] = "cannot_connect"
   ```
 - **Duplicate Prevention**: Prevent duplicate configurations:
-  ```python
+  ```text
   # Using unique ID
   await self.async_set_unique_id(identifier)
   self._abort_if_unique_id_configured()
@@ -262,7 +263,7 @@ rules:
 - **Required Method**: Implement `async_step_reauth` in config flow
 - **Credential Updates**: Allow users to update credentials without re-adding
 - **Validation**: Verify account matches existing unique ID:
-  ```python
+  ```text
   await self.async_set_unique_id(user_id)
   self._abort_if_unique_id_mismatch(reason="wrong_account")
   return self.async_update_reload_and_abort(
@@ -284,7 +285,7 @@ rules:
   }
   ```
 - **Discovery Handler**: Implement appropriate `async_step_*` method:
-  ```python
+  ```text
   async def async_step_zeroconf(self, discovery_info):
       """Handle zeroconf discovery."""
       await self.async_set_unique_id(discovery_info.properties["serialno"])
@@ -294,11 +295,11 @@ rules:
 
 ### Network Discovery Implementation
 - **Zeroconf/mDNS**: Use async instances
-  ```python
+  ```text
   aiozc = await zeroconf.async_get_async_instance(hass)
   ```
 - **SSDP Discovery**: Register callbacks with cleanup
-  ```python
+  ```text
   entry.async_on_unload(
       ssdp.async_register_callback(
           hass, _async_discovered_device, 
@@ -311,7 +312,7 @@ rules:
 - **Manifest Dependencies**: Add `bluetooth_adapters` to dependencies
 - **Connectable**: Set `"connectable": true` for connection-required devices
 - **Scanner Usage**: Always use shared scanner instance
-  ```python
+  ```text
   scanner = bluetooth.async_get_scanner()
   entry.async_on_unload(
       bluetooth.async_register_callback(
@@ -334,7 +335,7 @@ rules:
 - **Required**: Implement `async_unload_entry` for runtime removal/reload
 - **Platform Unloading**: Use `hass.config_entries.async_unload_platforms`
 - **Cleanup**: Register callbacks with `entry.async_on_unload`:
-  ```python
+  ```text
   async def async_unload_entry(hass: HomeAssistant, entry: MyConfigEntry) -> bool:
       """Unload a config entry."""
       if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
@@ -345,7 +346,7 @@ rules:
 ### Service Actions
 - **Registration**: Register all service actions in `async_setup`, NOT in `async_setup_entry`
 - **Validation**: Check config entry existence and loaded state:
-  ```python
+  ```text
   async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
       async def service_action(call: ServiceCall) -> ServiceResponse:
           if not (entry := hass.config_entries.async_get_entry(call.data[ATTR_CONFIG_ENTRY_ID])):
@@ -354,7 +355,7 @@ rules:
               raise ServiceValidationError("Entry not loaded")
   ```
 - **Exception Handling**: Raise appropriate exceptions:
-  ```python
+  ```text
   # For invalid input
   if end_date < start_date:
       raise ServiceValidationError("End date must be after start date")
@@ -368,7 +369,7 @@ rules:
 
 ### Service Registration Patterns
 - **Entity Services**: Register on platform setup
-  ```python
+  ```text
   platform.async_register_entity_service(
       "my_entity_service",
       {vol.Required("parameter"): cv.string},
@@ -376,7 +377,7 @@ rules:
   )
   ```
 - **Service Schema**: Always validate input
-  ```python
+  ```text
   SERVICE_SCHEMA = vol.Schema({
       vol.Required("entity_id"): cv.entity_ids,
       vol.Required("parameter"): cv.string,
@@ -393,7 +394,7 @@ rules:
   - Local network: 5 seconds
   - Cloud services: 60 seconds
 - **Parallel Updates**: Specify number of concurrent updates:
-  ```python
+  ```text
   PARALLEL_UPDATES = 1  # Serialize updates to prevent overwhelming device
   # OR
   PARALLEL_UPDATES = 0  # Unlimited (for coordinator-based or read-only)
@@ -414,7 +415,7 @@ rules:
     - ✅ Allowed in config flows to ensure robustness
     - ✅ Allowed in functions/methods that run in background tasks
   - Bad pattern:
-    ```python
+    ```text
     try:
         data = await device.get_data()  # Can throw
         # ❌ Don't process data inside try block
@@ -424,7 +425,7 @@ rules:
         _LOGGER.error("Failed to get data")
     ```
   - Good pattern:
-    ```python
+    ```text
     try:
         data = await device.get_data()  # Can throw
     except DeviceError:
@@ -436,7 +437,7 @@ rules:
     self._attr_native_value = processed
     ```
 - **Bare Exception Usage**:
-  ```python
+  ```text
   # ❌ Not allowed in regular code
   try:
       data = await device.get_data()
@@ -458,7 +459,7 @@ rules:
           _LOGGER.exception("Unexpected error in background task")
   ```
 - **Setup Failure Patterns**:
-  ```python
+  ```text
   try:
       await device.async_setup()
   except (asyncio.TimeoutError, TimeoutException) as ex:
@@ -474,7 +475,7 @@ rules:
   - No sensitive data (keys, tokens, passwords)
 - Use debug level for non-user-facing messages
 - **Use Lazy Logging**:
-  ```python
+  ```text
   _LOGGER.debug("This is a log message with %s", variable)
   ```
 
@@ -482,7 +483,7 @@ rules:
 - **Log Once**: When device/service becomes unavailable (info level)
 - **Log Recovery**: When device/service comes back online
 - **Implementation Pattern**:
-  ```python
+  ```text
   _unavailable_logged: bool = False
   
   if not self._unavailable_logged:
@@ -501,7 +502,7 @@ rules:
 - Must be unique per platform (not per integration)
 - Don't include integration domain or platform in ID
 - **Implementation**:
-  ```python
+  ```text
   class MySensor(SensorEntity):
       def __init__(self, device_id: str) -> None:
           self._attr_unique_id = f"{device_id}_temperature"
@@ -522,7 +523,7 @@ rules:
 - **Lambda/Anonymous Functions**: Often used in EntityDescription for value transformation
 - **Multiline Lambdas**: When lambdas exceed line length, wrap in parentheses for readability
 - **Bad pattern**:
-  ```python
+  ```text
   SensorEntityDescription(
       key="temperature",
       name="Temperature",
@@ -530,7 +531,7 @@ rules:
   )
   ```
 - **Good pattern**:
-  ```python
+  ```text
   SensorEntityDescription(
       key="temperature", 
       name="Temperature",
@@ -545,7 +546,7 @@ rules:
 ### Entity Naming
 - **Use has_entity_name**: Set `_attr_has_entity_name = True`
 - **For specific fields**:
-  ```python
+  ```text
   class MySensor(SensorEntity):
       _attr_has_entity_name = True
       def __init__(self, device: Device, field: str) -> None:
@@ -559,7 +560,7 @@ rules:
 
 ### Event Lifecycle Management
 - **Subscribe in `async_added_to_hass`**:
-  ```python
+  ```text
   async def async_added_to_hass(self) -> None:
       """Subscribe to events."""
       self.async_on_remove(
@@ -576,14 +577,14 @@ rules:
 ### Entity Availability
 - **Mark Unavailable**: When data cannot be fetched from device/service
 - **Coordinator Pattern**:
-  ```python
+  ```text
   @property
   def available(self) -> bool:
       """Return if entity is available."""
       return super().available and self.identifier in self.coordinator.data
   ```
 - **Direct Update Pattern**:
-  ```python
+  ```text
   async def async_update(self) -> None:
       """Update entity."""
       try:
@@ -605,7 +606,7 @@ rules:
 ### Device Registry
 - **Create Devices**: Group related entities under devices
 - **Device Info**: Provide comprehensive metadata:
-  ```python
+  ```text
   _attr_device_info = DeviceInfo(
       connections={(CONNECTION_NETWORK_MAC, device.mac)},
       identifiers={(DOMAIN, device.id)},
@@ -620,7 +621,7 @@ rules:
 ### Dynamic Device Addition
 - **Auto-detect New Devices**: After initial setup
 - **Implementation Pattern**:
-  ```python
+  ```text
   def _check_device() -> None:
       current_devices = set(coordinator.data)
       new_devices = current_devices - known_devices
@@ -634,7 +635,7 @@ rules:
 ### Stale Device Removal
 - **Auto-remove**: When devices disappear from hub/account
 - **Device Registry Update**:
-  ```python
+  ```text
   device_registry.async_update_device(
       device_id=device.id,
       remove_config_entry_id=self.config_entry.entry_id,
@@ -647,7 +648,7 @@ rules:
 ### Integration Diagnostics
 - **Required**: Implement diagnostic data collection
 - **Implementation**:
-  ```python
+  ```text
   TO_REDACT = [CONF_API_KEY, CONF_LATITUDE, CONF_LONGITUDE]
   
   async def async_get_config_entry_diagnostics(
@@ -669,7 +670,7 @@ rules:
   - Use friendly, helpful language
   - Include relevant context (device names, error details, etc.)
 - **Implementation**:
-  ```python
+  ```text
   ir.async_create_issue(
       hass,
       DOMAIN,
@@ -702,7 +703,7 @@ rules:
   - `ERROR`: Requires immediate user attention  
   - `WARNING`: Indicates future potential breakage
 - **Additional Attributes**:
-  ```python
+  ```text
   ir.async_create_issue(
       hass, DOMAIN, "issue_id",
       breaks_in_ha_version="2024.1.0",
@@ -717,7 +718,7 @@ rules:
 ### Entity Categories
 - **Required**: Assign appropriate category to entities
 - **Implementation**: Set `_attr_entity_category`
-  ```python
+  ```text
   class MySensor(SensorEntity):
       _attr_entity_category = EntityCategory.DIAGNOSTIC
   ```
@@ -725,7 +726,7 @@ rules:
 
 ### Device Classes
 - **Use When Available**: Set appropriate device class for entity type
-  ```python
+  ```text
   class MyTemperatureSensor(SensorEntity):
       _attr_device_class = SensorDeviceClass.TEMPERATURE
   ```
@@ -733,7 +734,7 @@ rules:
 
 ### Disabled by Default
 - **Disable Noisy/Less Popular Entities**: Reduce resource usage
-  ```python
+  ```text
   class MySignalStrengthSensor(SensorEntity):
       _attr_entity_registry_enabled_default = False
   ```
@@ -742,7 +743,7 @@ rules:
 ### Entity Translations
 - **Required with has_entity_name**: Support international users
 - **Implementation**:
-  ```python
+  ```text
   class MySensor(SensorEntity):
       _attr_has_entity_name = True
       _attr_translation_key = "phase_voltage"
@@ -763,7 +764,7 @@ rules:
 ### Exception Translations (Gold)
 - **Translatable Errors**: Use translation keys for user-facing exceptions
 - **Implementation**:
-  ```python
+  ```text
   raise ServiceValidationError(
       translation_domain=DOMAIN,
       translation_key="end_date_before_start_date",
@@ -921,7 +922,7 @@ homeassistant/components/my_integration/
 ## Common Anti-Patterns & Best Practices
 
 ### ❌ **Avoid These Patterns**
-```python
+```text
 # Blocking operations in event loop
 data = requests.get(url)  # ❌ Blocks event loop
 time.sleep(5)  # ❌ Blocks event loop
@@ -971,7 +972,7 @@ except Exception:  # ❌ Too broad - catch specific exceptions
 ```
 
 ### ✅ **Use These Patterns Instead**
-```python
+```text
 # Async operations with executor
 data = await hass.async_add_executor_job(requests.get, url)
 await asyncio.sleep(5)  # ✅ Non-blocking
@@ -1015,7 +1016,7 @@ class MyCoordinator(DataUpdateCoordinator[MyData]):
 ```
 
 ### Entity Performance Optimization
-```python
+```text
 # Use __slots__ for memory efficiency
 class MySensor(SensorEntity):
     __slots__ = ("_attr_native_value", "_attr_available")
@@ -1036,7 +1037,7 @@ class MySensor(SensorEntity):
 - **Verify registries** - Ensure entities are properly registered with devices
 
 ### Config Flow Testing Template
-```python
+```text
 async def test_user_flow_success(hass, mock_api):
     """Test successful user flow."""
     result = await hass.config_entries.flow.async_init(
@@ -1066,7 +1067,7 @@ async def test_flow_connection_error(hass, mock_api_error):
 ```
 
 ### Entity Testing Patterns
-```python
+```text
 @pytest.mark.parametrize("init_integration", [Platform.SENSOR], indirect=True)
 @pytest.mark.usefixtures("entity_registry_enabled_by_default", "init_integration")
 async def test_entities(
@@ -1092,7 +1093,7 @@ async def test_entities(
 ```
 
 ### Mock Patterns
-```python
+```text
 # Modern integration fixture setup
 @pytest.fixture
 def mock_config_entry() -> MockConfigEntry:
@@ -1137,7 +1138,7 @@ async def init_integration(
 - **Tests failing**: Check mock setup and async context
 
 ### Debug Logging Setup
-```python
+```text
 # Enable debug logging in tests
 caplog.set_level(logging.DEBUG, logger="my_integration")
 
@@ -1159,3 +1160,4 @@ pytest ./tests/components/my_integration \
   --cov=homeassistant.components.my_integration \
   --cov-report term-missing
 ```
+

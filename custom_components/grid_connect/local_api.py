@@ -19,6 +19,7 @@ class GridConnectAPI:
             host: The device IP or hostname.
             username: Login username (if needed).
             password: Login password (if needed).
+            model: Device model identifier if known.
 
         """
         self.host = host
