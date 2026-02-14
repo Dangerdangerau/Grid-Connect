@@ -5,7 +5,7 @@ from __future__ import annotations
 from inspect import isawaitable
 import logging
 from typing import Any
-
+#to make git update (remove soon)
 _BleakClient: type[Any] | None
 _BleakError: type[BaseException] | None
 
