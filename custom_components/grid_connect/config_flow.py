@@ -138,8 +138,8 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required("action", default="ez"): vol.In(
                         {
                             "ez": "EZ Mode (Wi-Fi pairing mode)",
-                            "scan": "BLE Scan (legacy)",
-                            "manual": "Specify Device Manually",
+                            "scan": "BLE Scan (non functional)",
+                            "manual": "Specify Device Manually (not-tested)",
                         }
                     )
                 }

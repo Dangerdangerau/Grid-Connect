@@ -58,10 +58,12 @@
       },
       "wifi_credentials": {
         "title": "Wi-Fi credentials",
-        "description": "Enter the Wi-Fi credentials to send to the device over BLE.",
+        "description": "Enter the Wi-Fi credentials to send to the device over Wi-Fi (EZ mode).",
         "data": {
           "ssid": "Wi-Fi SSID",
           "password": "Wi-Fi password",
+          "host": "Device host/IP (optional)",
+          "device_name": "Device name (optional)",
           "model": "Device model (optional)"
         }
       }
