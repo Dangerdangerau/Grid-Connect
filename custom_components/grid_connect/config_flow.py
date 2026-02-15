@@ -24,6 +24,7 @@ from homeassistant.core import callback
 
 from .ble_wifi import GRID_CONNECT_SERVICE_UUID, send_wifi_credentials
 from .const import CONF_MODEL, DOMAIN, MODEL_PC191BKHA, MODEL_PC191HA
+from .ez_mode import send_ez_mode_credentials
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -124,13 +125,25 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Entry step: start BLE scan or manual add."""
         errors = {}
         if user_input is not None:
+            if user_input.get("action") == "ez":
+                return await self.async_step_wifi_credentials()
             if user_input.get("action") == "scan":
                 return await self.async_step_ble_scan()
             if user_input.get("action") == "manual":
                 return await self.async_step_manual()
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({vol.Required("action", default="scan"): vol.In({"scan": "Scan for Devices", "manual": "Specify Device Manually"})}),
+            data_schema=vol.Schema(
+                {
+                    vol.Required("action", default="ez"): vol.In(
+                        {
+                            "ez": "EZ Mode (Wi-Fi pairing mode)",
+                            "scan": "BLE Scan (legacy)",
+                            "manual": "Specify Device Manually",
+                        }
+                    )
+                }
+            ),
             errors=errors,
         )
 
@@ -391,45 +404,51 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         selected_device = self.context.get("selected_ble_device")
         grid_connect_uuid = self.context.get("grid_connect_uuid")
 
-        if not selected_device or not grid_connect_uuid:
-            _LOGGER.error(
-                "Missing selected device or grid_connect_uuid in context before Wi-Fi step."
-            )
-            return await self.async_step_manual()
-
         errors: dict[str, str] = {}
 
         if user_input is not None:
             ssid = user_input["ssid"]
             password = user_input["password"]
+            host = user_input.get("host", "")
+            device_name = user_input.get("device_name")
             _LOGGER.info(
-                "Attempting BLE Wi-Fi provisioning for %s on SSID '%s'",
-                selected_device.get("address"),
+                "Attempting EZ-mode Wi-Fi provisioning on SSID '%s'",
                 ssid,
             )
 
-            # Attempt to send Wi-Fi credentials over BLE
-            result = await send_wifi_credentials(
-                selected_device["address"],
-                ssid,
-                password,
-                preferred_service_uuid=grid_connect_uuid,
-            )
+            # Prefer EZ-mode broadcast. If the flow came from BLE selection, fall back to BLE write.
+            result = await send_ez_mode_credentials(ssid, password)
+            if (
+                result is not None
+                and selected_device
+                and grid_connect_uuid
+            ):
+                result = await send_wifi_credentials(
+                    selected_device["address"],
+                    ssid,
+                    password,
+                    preferred_service_uuid=grid_connect_uuid,
+                )
 
             if result is None:
-                detected_model = _detect_model_from_name(selected_device.get("name"))
+                selected_name = selected_device.get("name") if selected_device else None
+                selected_address = (
+                    selected_device.get("address") if selected_device else None
+                )
+                detected_model = _detect_model_from_name(selected_name)
                 _LOGGER.info(
                     "Wi-Fi provisioning succeeded for %s (model=%s)",
-                    selected_device.get("address"),
+                    selected_address or host,
                     detected_model or user_input.get(CONF_MODEL),
                 )
                 # Success - create the config entry
                 return self.async_create_entry(
-                    title=selected_device.get("name") or "Grid Connect Device",
+                    title=device_name or selected_name or "Grid Connect Device",
                     data={
-                        "device_address": selected_device["address"],
-                        "grid_connect_uuid": grid_connect_uuid,
-                        "device_name": selected_device.get("name") or "Grid Connect Device",
+                        "device_address": selected_address or "",
+                        "grid_connect_uuid": grid_connect_uuid or GRID_CONNECT_SERVICE_UUID,
+                        "device_name": device_name or selected_name or "Grid Connect Device",
+                        "host": host,
                         "wifi_ssid": ssid,
                         CONF_MODEL: detected_model or user_input.get(CONF_MODEL),
                     },
@@ -445,6 +464,8 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "ble_error"
             elif result == "timeout":
                 errors["base"] = "ble_timeout"
+            elif result == "ez_mode_error":
+                errors["base"] = "ble_unknown_error"
             else:
                 errors["base"] = "ble_unknown_error"
 
@@ -464,6 +485,8 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required("ssid"): str,
                     vol.Required("password"): str,
+                    vol.Optional("host"): str,
+                    vol.Optional("device_name"): str,
                     model_field: vol.In(
                         {
                             MODEL_PC191HA: "Arlec Smart Plug + Energy (PC191HA)",
