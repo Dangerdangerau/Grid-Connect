@@ -40,7 +40,9 @@ def _normalized_uuid(value: str | None) -> str:
 
 
 async def _candidate_write_characteristics(
-    client: Any, preferred_service_uuid: str | None
+    client: Any,
+    preferred_service_uuid: str | None,
+    bleak_exceptions: tuple[type[BaseException], ...],
 ) -> list[str]:
     """Return candidate writable characteristic UUIDs in priority order."""
     candidates: list[str] = [WIFI_WRITE_CHAR_UUID]
@@ -48,7 +50,9 @@ async def _candidate_write_characteristics(
 
     try:
         services = await client.get_services()
-    except Exception:
+    except TimeoutError:
+        return candidates
+    except bleak_exceptions:
         return candidates
 
     preferred: list[str] = []
@@ -99,8 +103,11 @@ async def send_wifi_credentials(
         return "bleak_not_installed"
 
     bleak_client = _get_bleak_client_class()
-    bleak_error = _BleakError
+    bleak_exceptions: tuple[type[BaseException], ...] = (
+        (_BleakError,) if _BleakError is not None else ()
+    )
     payload = format_wifi_payload(ssid, password)
+    not_connected = False
 
     for attempt in range(1, retries + 1):
         try:
@@ -110,38 +117,43 @@ async def send_wifi_credentials(
 
                 if not await _is_client_connected(client):
                     if attempt == retries:
-                        return "not_connected"
+                        not_connected = True
+                        break
                     continue
 
                 write_uuids = await _candidate_write_characteristics(
-                    client, preferred_service_uuid
+                    client, preferred_service_uuid, bleak_exceptions
                 )
                 for char_uuid in write_uuids:
                     try:
                         await client.write_gatt_char(char_uuid, payload, response=True)
+                    except TimeoutError:
+                        continue
+                    except bleak_exceptions:
+                        continue
+                    else:
                         _LOGGER.debug(
                             "Provisioning write succeeded for %s using characteristic %s",
                             address,
                             char_uuid,
                         )
                         return None
-                    except Exception:
-                        continue
         except TimeoutError:
             if attempt == retries:
                 _LOGGER.exception("BLE operation timed out while provisioning %s", address)
                 return "timeout"
-        except Exception as err:
-            if bleak_error is not None and isinstance(err, bleak_error):
-                if attempt == retries:
-                    _LOGGER.exception(
-                        "BLE transport/protocol error while provisioning %s", address
-                    )
-                    return "ble_error"
-            elif attempt == retries:
+        except bleak_exceptions:
+            if attempt == retries:
+                _LOGGER.exception("BLE transport/protocol error while provisioning %s", address)
+                return "ble_error"
+        except (OSError, RuntimeError):
+            if attempt == retries:
                 _LOGGER.exception(
                     "Unexpected BLE Wi-Fi credential send error for %s", address
                 )
                 return "ble_unknown_error"
+
+    if not_connected:
+        return "not_connected"
 
     return "ble_error"
