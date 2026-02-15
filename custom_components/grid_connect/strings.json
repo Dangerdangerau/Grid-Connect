@@ -42,7 +42,7 @@
       },
       "wifi_credentials": {
         "title": "Wi-Fi credentials",
-        "description": "Enter the Wi-Fi credentials to send to the device over BLE.",
+        "description": "Enter the Wi-Fi credentials to send to the device over Wi-Fi (EZ mode).",
         "data": {
           "ssid": "Wi-Fi SSID",
           "password": "Wi-Fi password",

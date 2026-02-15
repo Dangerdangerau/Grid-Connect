@@ -400,7 +400,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_wifi_credentials(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Ask the user for Wi-Fi credentials and send them via BLE."""
+        """Ask the user for Wi-Fi credentials and provision via EZ mode."""
         selected_device = self.context.get("selected_ble_device")
         grid_connect_uuid = self.context.get("grid_connect_uuid")
 
