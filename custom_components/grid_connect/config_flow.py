@@ -469,9 +469,9 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 errors["base"] = "ble_unknown_error"
 
-        suggested_model = (
-            _detect_model_from_name(selected_device.get("name"))
-            or self.context.get(CONF_MODEL)
+        selected_name = selected_device.get("name") if selected_device else None
+        suggested_model = _detect_model_from_name(selected_name) or self.context.get(
+            CONF_MODEL
         )
         model_field: Any
         if suggested_model in {MODEL_PC191HA, MODEL_PC191BKHA}:
