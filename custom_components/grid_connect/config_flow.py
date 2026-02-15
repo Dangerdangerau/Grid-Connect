@@ -23,13 +23,7 @@ from homeassistant.components import bluetooth
 from homeassistant.core import callback
 
 from .ble_wifi import GRID_CONNECT_SERVICE_UUID, send_wifi_credentials
-from .const import (
-    CONF_MODEL,
-    DOMAIN,
-    MODEL_PC191BKHA,
-    MODEL_PC191HA,
-    MODEL_SG120HA,
-)
+from .const import CONF_MODEL, DOMAIN, MODEL_PC191BKHA, MODEL_PC191HA, MODEL_SG120HA
 from .ez_mode import send_ez_mode_credentials
 
 _LOGGER = logging.getLogger(__name__)
