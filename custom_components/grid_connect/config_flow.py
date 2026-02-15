@@ -23,7 +23,7 @@ from homeassistant.components import bluetooth
 from homeassistant.core import callback
 
 from .ble_wifi import GRID_CONNECT_SERVICE_UUID, send_wifi_credentials
-from .const import CONF_MODEL, DOMAIN, MODEL_PC191BKHA, MODEL_PC191HA
+from .const import CONF_MODEL, DOMAIN, MODEL_PC191BKHA, MODEL_PC191HA, MODEL_SG120HA
 from .ez_mode import send_ez_mode_credentials
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ _GRID_CONNECT_NAME_HINTS: tuple[str, ...] = (
     "SG120",
     MODEL_PC191HA,
     MODEL_PC191BKHA,
+    MODEL_SG120HA,
 )
 
 
@@ -67,6 +68,8 @@ def _detect_model_from_name(device_name: str | None) -> str | None:
         return MODEL_PC191BKHA
     if MODEL_PC191HA in normalized:
         return MODEL_PC191HA
+    if MODEL_SG120HA in normalized:
+        return MODEL_SG120HA
     if "SMART PLUG" in normalized:
         # Bunnings listing references the white variant (PC191HA).
         return MODEL_PC191HA
@@ -126,8 +129,10 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         if user_input is not None:
             if user_input.get("action") == "ez":
+                self.context["provisioning_method"] = "ez"
                 return await self.async_step_wifi_credentials()
             if user_input.get("action") == "scan":
+                self.context["provisioning_method"] = "ble"
                 return await self.async_step_ble_scan()
             if user_input.get("action") == "manual":
                 return await self.async_step_manual()
@@ -138,8 +143,8 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required("action", default="ez"): vol.In(
                         {
                             "ez": "EZ Mode (Wi-Fi pairing mode)",
-                            "scan": "BLE Scan (non functional)",
-                            "manual": "Specify Device Manually (not-tested)",
+                            "scan": "BLE Scan (legacy)",
+                            "manual": "Specify Device Manually",
                         }
                     )
                 }
@@ -403,26 +408,64 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Ask the user for Wi-Fi credentials and provision via EZ mode."""
         selected_device = self.context.get("selected_ble_device")
         grid_connect_uuid = self.context.get("grid_connect_uuid")
+        provisioning_method = self.context.get("provisioning_method", "ez")
 
         errors: dict[str, str] = {}
+
+        if (
+            self.context.get("ez_provisioned")
+            and selected_device
+            and grid_connect_uuid
+        ):
+            model = self.context.get(CONF_MODEL)
+            selected_name = selected_device.get("name")
+            selected_address = selected_device.get("address")
+            host = self.context.get("host", "")
+            return self.async_create_entry(
+                title=selected_name or "Grid Connect Device",
+                data={
+                    "device_address": selected_address or "",
+                    "grid_connect_uuid": grid_connect_uuid,
+                    "device_name": selected_name or "Grid Connect Device",
+                    "host": host,
+                    "wifi_ssid": self.context.get("wifi_ssid", ""),
+                    CONF_MODEL: model,
+                },
+            )
 
         if user_input is not None:
             ssid = user_input["ssid"]
             password = user_input["password"]
             host = user_input.get("host", "")
-            device_name = user_input.get("device_name")
+            selected_name = selected_device.get("name") if selected_device else None
+            device_name = user_input.get("device_name") or selected_name
+            model_input = user_input.get(CONF_MODEL)
             _LOGGER.info(
                 "Attempting EZ-mode Wi-Fi provisioning on SSID '%s'",
                 ssid,
             )
 
-            # Prefer EZ-mode broadcast. If the flow came from BLE selection, fall back to BLE write.
-            result = await send_ez_mode_credentials(ssid, password)
-            if (
-                result is not None
-                and selected_device
-                and grid_connect_uuid
-            ):
+            if provisioning_method == "ez":
+                result = await send_ez_mode_credentials(ssid, password)
+                if result is None:
+                    self.context["wifi_ssid"] = ssid
+                    self.context["wifi_password"] = password
+                    self.context["host"] = host
+                    self.context[CONF_MODEL] = model_input
+                    self.context["device_name"] = device_name
+                    self.context["ez_provisioned"] = True
+                    return await self.async_step_ble_scan()
+            else:
+                result = "ble_error"
+                if selected_device and grid_connect_uuid:
+                    result = await send_wifi_credentials(
+                        selected_device["address"],
+                        ssid,
+                        password,
+                        preferred_service_uuid=grid_connect_uuid,
+                    )
+
+            if result is None and selected_device and grid_connect_uuid:
                 result = await send_wifi_credentials(
                     selected_device["address"],
                     ssid,
@@ -431,7 +474,6 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
 
             if result is None:
-                selected_name = selected_device.get("name") if selected_device else None
                 selected_address = (
                     selected_device.get("address") if selected_device else None
                 )
@@ -450,7 +492,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         "device_name": device_name or selected_name or "Grid Connect Device",
                         "host": host,
                         "wifi_ssid": ssid,
-                        CONF_MODEL: detected_model or user_input.get(CONF_MODEL),
+                        CONF_MODEL: detected_model or model_input,
                     },
                 )
 
@@ -474,7 +516,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_MODEL
         )
         model_field: Any
-        if suggested_model in {MODEL_PC191HA, MODEL_PC191BKHA}:
+        if suggested_model in {MODEL_PC191HA, MODEL_PC191BKHA, MODEL_SG120HA}:
             model_field = vol.Optional(CONF_MODEL, default=suggested_model)
         else:
             model_field = vol.Optional(CONF_MODEL)
@@ -491,6 +533,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         {
                             MODEL_PC191HA: "Arlec Smart Plug + Energy (PC191HA)",
                             MODEL_PC191BKHA: "Arlec Smart Plug + Energy (PC191BKHA)",
+                            MODEL_SG120HA: "Arlec Smart Plug (SG120HA)",
                         }
                     ),
                 }
@@ -525,6 +568,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     {
                         MODEL_PC191HA: "Arlec Smart Plug + Energy (PC191HA)",
                         MODEL_PC191BKHA: "Arlec Smart Plug + Energy (PC191BKHA)",
+                        MODEL_SG120HA: "Arlec Smart Plug (SG120HA)",
                     }
                 ),
             }),
