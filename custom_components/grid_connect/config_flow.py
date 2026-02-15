@@ -410,7 +410,10 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             # Attempt to send Wi-Fi credentials over BLE
             result = await send_wifi_credentials(
-                selected_device["address"], ssid, password
+                selected_device["address"],
+                ssid,
+                password,
+                preferred_service_uuid=grid_connect_uuid,
             )
 
             if result is None:
