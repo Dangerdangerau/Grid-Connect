@@ -18,6 +18,7 @@ from .bluetooth import discover_bluetooth_devices
 from .const import CONF_MODEL, DOMAIN
 from .coordinator import GridConnectDataUpdateCoordinator
 from .local_api import GridConnectAPI
+from .server import async_setup_provisioning_server
 
 _LOGGER = logging.getLogger(__name__)  # Set up the logger
 
@@ -26,6 +27,8 @@ _LOGGER = logging.getLogger(__name__)  # Set up the logger
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up Grid Connect component and register services from services.yaml."""
+    hass.data.setdefault(DOMAIN, {})
+    async_setup_provisioning_server(hass)
     # Register custom services
     hass.services.async_register(DOMAIN, "turn_on", lambda call: None)
     hass.services.async_register(DOMAIN, "turn_off", lambda call: None)

@@ -1,14 +1,23 @@
 """Constants for the Grid connect integration."""
 
 DOMAIN = "grid_connect"
+DATA_SERVER = "server"
+
+PROVISIONING_API_BASE = "/api/grid_connect/provisioning"
+DEFAULT_PROVISIONING_SESSION_TTL = 15 * 60
 
 CONF_MODEL = "model"
 MODEL_PC191HA = "PC191HA"
 MODEL_PC191BKHA = "PC191BKHA"
 MODEL_SG120HA = "SG120HA"
 
-SUPPORTED_SMART_PLUG_MODELS: set[str] = {
+SUPPORTED_SWITCH_MODELS: set[str] = {
     MODEL_PC191HA,
     MODEL_PC191BKHA,
     MODEL_SG120HA,
+}
+
+SUPPORTED_ENERGY_SENSOR_MODELS: set[str] = {
+    MODEL_PC191HA,
+    MODEL_PC191BKHA,
 }

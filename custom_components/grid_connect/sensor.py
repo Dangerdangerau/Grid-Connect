@@ -25,7 +25,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from .const import CONF_MODEL, DOMAIN, SUPPORTED_SMART_PLUG_MODELS
+from .const import CONF_MODEL, DOMAIN, SUPPORTED_ENERGY_SENSOR_MODELS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Grid Connect sensors."""
-    if entry.data.get(CONF_MODEL) not in SUPPORTED_SMART_PLUG_MODELS:
+    if entry.data.get(CONF_MODEL) not in SUPPORTED_ENERGY_SENSOR_MODELS:
         _LOGGER.debug(
             "Skipping sensor setup for entry %s model=%s",
             entry.entry_id,

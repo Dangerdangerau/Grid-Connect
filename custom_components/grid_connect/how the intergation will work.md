@@ -44,10 +44,12 @@ The Grid Connect integration enables users to add and configure Grid Connect dev
 
 **Development To-Do**
 
-```yaml
-1. Implement Bluetooth Discovery:
+
+1. create a server on ports 8886 and 443 that functions the same as the tuya cloud server
+
+2. Implement Bluetooth Discovery:
   - Integrate a suitable BLE library (e.g., Bleak) into config_flow.py.
-  - Create functions to scan for devices advertising the Grid Connect service UUID.
+  - Create functions to scan f`o devices advertising the Grid Connect service UUID.
 
 2. Add Background Scanning:
   - Design an asynchronous task in the config flow that continuously scans for a specified duration.
@@ -72,4 +74,3 @@ The Grid Connect integration enables users to add and configure Grid Connect dev
 7. Error Handling and Edge Cases:
   - Cover scenarios such as Bluetooth permissions denied, network unreachable, or device already claimed.
   - Ensure the flow can gracefully abort and offer retries or alternate options.
-```
