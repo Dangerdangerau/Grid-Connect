@@ -10,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from aiohttp import web
+
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant, callback
 
