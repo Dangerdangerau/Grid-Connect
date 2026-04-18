@@ -1,7 +1,8 @@
 {
   "config": {
     "abort": {
-      "already_configured": "Device is already configured"
+      "already_configured": "Device is already configured",
+      "device_added_to_hub": "Device added to the existing Grid Connect Hub"
     },
     "error": {
       "cannot_connect": "Failed to connect",

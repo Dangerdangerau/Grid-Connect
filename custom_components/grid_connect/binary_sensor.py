@@ -17,8 +17,9 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from . import GridConnectRuntimeData
 from .const import DOMAIN
-from .device import build_child_device_info
+from .device import build_child_device_info, device_unique_token
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,8 +30,18 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Grid Connect binary sensor platform."""
-    coordinator: DataUpdateCoordinator[Any] = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([GridConnectBinarySensor(entry, coordinator)])
+    runtime_data: GridConnectRuntimeData = hass.data[DOMAIN][entry.entry_id]
+    entities = [
+        GridConnectBinarySensor(
+            entry,
+            device,
+            runtime_data.coordinators[device_unique_token(device, f"device_{index}")],
+            f"Device {index}",
+        )
+        for index, device in enumerate(runtime_data.devices, start=1)
+    ]
+    if entities:
+        async_add_entities(entities)
 
 
 class GridConnectBinarySensor(
@@ -39,14 +50,19 @@ class GridConnectBinarySensor(
     """Representation of a Grid Connect binary sensor."""
 
     def __init__(
-        self, entry: ConfigEntry, coordinator: DataUpdateCoordinator[Any]
+        self,
+        entry: ConfigEntry,
+        device: dict[str, Any],
+        coordinator: DataUpdateCoordinator[Any],
+        fallback_name: str,
     ) -> None:
         """Initialize the binary sensor."""
         super().__init__(coordinator)
         self._attr_has_entity_name = True
         self._attr_name = "Sensor"
-        self._attr_unique_id = f"{entry.entry_id}_sensor"
-        self._attr_device_info = build_child_device_info(entry)
+        device_token = device_unique_token(device, fallback_name)
+        self._attr_unique_id = f"{entry.entry_id}_{device_token}_sensor"
+        self._attr_device_info = build_child_device_info(entry, device, fallback_name)
         self._attr_device_class = BinarySensorDeviceClass.MOTION
         _LOGGER.debug("Initialized Grid Connect binary sensor")
 

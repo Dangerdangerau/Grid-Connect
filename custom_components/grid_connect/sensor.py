@@ -25,8 +25,9 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from . import GridConnectRuntimeData
 from .const import CONF_MODEL, DOMAIN, SUPPORTED_ENERGY_SENSOR_MODELS
-from .device import build_child_device_info
+from .device import build_child_device_info, device_unique_token
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -91,25 +92,30 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Grid Connect sensors."""
-    if entry.data.get(CONF_MODEL) not in SUPPORTED_ENERGY_SENSOR_MODELS:
-        _LOGGER.debug(
-            "Skipping sensor setup for entry %s model=%s",
-            entry.entry_id,
-            entry.data.get(CONF_MODEL),
-        )
-        return
-    _LOGGER.info(
-        "Setting up energy sensor platform for entry %s model=%s",
-        entry.entry_id,
-        entry.data.get(CONF_MODEL),
-    )
-    coordinator: DataUpdateCoordinator[Any] = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
-        [
-            GridConnectSensor(entry, coordinator, description, value_key)
+    runtime_data: GridConnectRuntimeData = hass.data[DOMAIN][entry.entry_id]
+    entities: list[GridConnectSensor] = []
+    for index, device in enumerate(runtime_data.devices, start=1):
+        if device.get(CONF_MODEL) not in SUPPORTED_ENERGY_SENSOR_MODELS:
+            _LOGGER.debug(
+                "Skipping sensor setup for entry %s device=%s model=%s",
+                entry.entry_id,
+                device.get("device_name"),
+                device.get(CONF_MODEL),
+            )
+            continue
+        coordinator = runtime_data.coordinators[device_unique_token(device, f"device_{index}")]
+        entities.extend(
+            GridConnectSensor(entry, device, coordinator, description, value_key, f"Device {index}")
             for description, value_key in SENSORS
-        ]
-    )
+        )
+
+    if entities:
+        _LOGGER.info(
+            "Setting up %d energy sensor entities for entry %s",
+            len(entities),
+            entry.entry_id,
+        )
+        async_add_entities(entities)
 
 
 class GridConnectSensor(CoordinatorEntity[DataUpdateCoordinator[Any]], SensorEntity):
@@ -118,9 +124,11 @@ class GridConnectSensor(CoordinatorEntity[DataUpdateCoordinator[Any]], SensorEnt
     def __init__(
         self,
         entry: ConfigEntry,
+        device: dict[str, Any],
         coordinator: DataUpdateCoordinator[Any],
         description: SensorEntityDescription,
         value_key: str,
+        fallback_name: str,
     ) -> None:
         """Initialize sensor entity."""
         super().__init__(coordinator)
@@ -128,8 +136,9 @@ class GridConnectSensor(CoordinatorEntity[DataUpdateCoordinator[Any]], SensorEnt
         self._value_key = value_key
         self._attr_has_entity_name = True
         self._attr_name = description.name
-        self._attr_unique_id = f"{entry.entry_id}_{description.key}"
-        self._attr_device_info = build_child_device_info(entry)
+        device_token = device_unique_token(device, fallback_name)
+        self._attr_unique_id = f"{entry.entry_id}_{device_token}_{description.key}"
+        self._attr_device_info = build_child_device_info(entry, device, fallback_name)
 
     @property
     def native_value(self) -> Any:

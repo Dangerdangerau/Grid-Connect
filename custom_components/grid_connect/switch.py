@@ -11,9 +11,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import GridConnectRuntimeData
 from .const import CONF_MODEL, DOMAIN, SUPPORTED_SWITCH_MODELS
 from .coordinator import GridConnectDataUpdateCoordinator
-from .device import build_child_device_info
+from .device import build_child_device_info, device_unique_token
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,20 +25,26 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Grid Connect switch platform."""
-    if entry.data.get(CONF_MODEL) not in SUPPORTED_SWITCH_MODELS:
-        _LOGGER.debug(
-            "Skipping switch setup for entry %s model=%s",
-            entry.entry_id,
-            entry.data.get(CONF_MODEL),
+    runtime_data: GridConnectRuntimeData = hass.data[DOMAIN][entry.entry_id]
+    entities: list[GridConnectPlugSwitch] = []
+    for index, device in enumerate(runtime_data.devices, start=1):
+        if device.get(CONF_MODEL) not in SUPPORTED_SWITCH_MODELS:
+            _LOGGER.debug(
+                "Skipping switch setup for entry %s device=%s model=%s",
+                entry.entry_id,
+                device.get("device_name"),
+                device.get(CONF_MODEL),
+            )
+            continue
+        device_token = device_unique_token(device, f"device_{index}")
+        coordinator = runtime_data.coordinators[device_token]
+        entities.append(
+            GridConnectPlugSwitch(entry, device, coordinator, f"Device {index}")
         )
-        return
-    _LOGGER.info(
-        "Setting up switch platform for entry %s model=%s",
-        entry.entry_id,
-        entry.data.get(CONF_MODEL),
-    )
-    coordinator: GridConnectDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([GridConnectPlugSwitch(entry, coordinator)])
+
+    if entities:
+        _LOGGER.info("Setting up %d switch entities for entry %s", len(entities), entry.entry_id)
+        async_add_entities(entities)
 
 
 class GridConnectPlugSwitch(
@@ -46,15 +53,20 @@ class GridConnectPlugSwitch(
     """Representation of Grid Connect smart plug relay."""
 
     def __init__(
-        self, entry: ConfigEntry, coordinator: GridConnectDataUpdateCoordinator
+        self,
+        entry: ConfigEntry,
+        device: dict[str, Any],
+        coordinator: GridConnectDataUpdateCoordinator,
+        fallback_name: str,
     ) -> None:
         """Initialize switch entity."""
         super().__init__(coordinator)
         self._entry = entry
         self._attr_has_entity_name = True
         self._attr_name = "Power"
-        self._attr_unique_id = f"{entry.entry_id}_power"
-        self._attr_device_info = build_child_device_info(entry)
+        device_token = device_unique_token(device, fallback_name)
+        self._attr_unique_id = f"{entry.entry_id}_{device_token}_power"
+        self._attr_device_info = build_child_device_info(entry, device, fallback_name)
 
     @property
     def is_on(self) -> bool:

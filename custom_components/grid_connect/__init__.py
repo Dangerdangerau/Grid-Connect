@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -15,9 +17,14 @@ from homeassistant.exceptions import (
 
 from .api import AuthenticationError
 from .bluetooth import discover_bluetooth_devices
-from .const import CONF_MODEL, DOMAIN
+from .const import DOMAIN
 from .coordinator import GridConnectDataUpdateCoordinator
-from .device import async_ensure_child_device, async_ensure_hub_device
+from .device import (
+    async_ensure_child_device,
+    async_ensure_hub_device,
+    device_unique_token,
+    get_entry_devices,
+)
 from .local_api import GridConnectAPI
 from .server import async_setup_provisioning_server
 
@@ -47,13 +54,23 @@ _PLATFORMS: list[Platform] = [
 GridConnectConfigEntry = ConfigEntry
 
 
+@dataclass(slots=True)
+class GridConnectRuntimeData:
+    """Runtime state for a Grid Connect hub entry."""
+
+    devices: list[dict[str, Any]]
+    coordinators: dict[str, GridConnectDataUpdateCoordinator]
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: GridConnectConfigEntry) -> bool:
     """Set up Grid Connect from a config entry."""
     try:
         hass.data.setdefault(DOMAIN, {})
         _LOGGER.info("Setting up Grid Connect entry_id=%s", entry.entry_id)
         async_ensure_hub_device(hass, entry)
-        async_ensure_child_device(hass, entry)
+        configured_devices = get_entry_devices(entry)
+        for index, device in enumerate(configured_devices, start=1):
+            async_ensure_child_device(hass, entry, device, f"Device {index}")
 
         if entry.data.get("use_bluetooth"):
             # Handle Bluetooth device setup
@@ -65,21 +82,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: GridConnectConfigEntry) 
 
         # Non-Bluetooth setup path
         try:
-            # Build and refresh coordinator used by entity platforms.
-            api_client = GridConnectAPI(
-                host=entry.data.get("host") or entry.data.get("device_address", ""),
-                username=entry.data.get("username", ""),
-                password=entry.data.get("password", ""),
-                model=entry.data.get(CONF_MODEL),
+            coordinators: dict[str, GridConnectDataUpdateCoordinator] = {}
+            for index, device in enumerate(configured_devices, start=1):
+                host = str(device.get("host") or device.get("device_address") or "")
+                api_client = GridConnectAPI(
+                    host=host,
+                    username=entry.data.get("username", ""),
+                    password=entry.data.get("password", ""),
+                    model=device.get("model"),
+                )
+                coordinator = GridConnectDataUpdateCoordinator(hass, api_client)
+                await coordinator.async_config_entry_first_refresh()
+                coordinators[device_unique_token(device, f"device_{index}")] = coordinator
+                _LOGGER.debug(
+                    "Coordinator initialized for entry_id=%s host=%s",
+                    entry.entry_id,
+                    host,
+                )
+
+            runtime_data = GridConnectRuntimeData(
+                devices=configured_devices,
+                coordinators=coordinators,
             )
-            coordinator = GridConnectDataUpdateCoordinator(hass, api_client)
-            await coordinator.async_config_entry_first_refresh()
-            hass.data[DOMAIN][entry.entry_id] = coordinator
-            _LOGGER.debug(
-                "Coordinator initialized for entry_id=%s host=%s",
-                entry.entry_id,
-                entry.data.get("host") or entry.data.get("device_address", ""),
-            )
+            hass.data[DOMAIN][entry.entry_id] = runtime_data
 
             # Forward the configuration entry to the defined platforms
             await hass.config_entries.async_forward_entry_setups(entry, _PLATFORMS)
@@ -87,7 +112,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: GridConnectConfigEntry) 
             _LOGGER.error("Failed to set up platforms: %s", err)
             return False
         else:
-            entry.runtime_data = coordinator
+            entry.runtime_data = runtime_data
             _LOGGER.info("Grid Connect setup complete for entry_id=%s", entry.entry_id)
             return True
 
