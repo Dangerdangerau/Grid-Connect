@@ -45,32 +45,38 @@ The Grid Connect integration enables users to add and configure Grid Connect dev
 **Development To-Do**
 
 
-1. create a server on ports 8886 and 443 that functions the same as the tuya cloud server
+1. create a server on ports 8886 and 443 that functions the same as the tuya cloud server - in progress
+2. set up a grid connect as a "hub" - documentation found
+  - Home Assistant manifest docs: https://developers.home-assistant.io/docs/creating_integration_manifest#integration-type
+  - Home Assistant blog explanation of `hub` vs `device` vs `service`: https://developers.home-assistant.io/blog/2022/10/24/hubs-devices-services-virtual-integrations
+  - Notes:
+    - `hub` is a manifest classification for integrations that provide a gateway to multiple devices or services.
+    - This project already sets `"integration_type": "hub"` in `custom_components/grid_connect/manifest.json`.
 
-2. Implement Bluetooth Discovery:
+3. Implement Bluetooth Discovery:
   - Integrate a suitable BLE library (e.g., Bleak) into config_flow.py.
   - Create functions to scan f`o devices advertising the Grid Connect service UUID.
 
-2. Add Background Scanning:
+4. Add Background Scanning:
   - Design an asynchronous task in the config flow that continuously scans for a specified duration.
   - Update the UI dynamically as devices are found without blocking the main thread.
 
-3. Support Manual Device Specification:
+5. Support Manual Device Specification:
   - Extend the flow to include a “Specify Device Manually” option when no devices appear automatically.
   - Maintain a JSON-backed registry of supported Grid Connect models for selection.
 
-4. Provide Reset & Pairing Instructions:
+6. Provide Reset & Pairing Instructions:
   - Develop UI panels with clear, illustrated steps on how to reset each device type.
   - Link the “Confirm Reset” action to re-trigger Bluetooth scanning.
 
-5. Manage Wi-Fi Credential Exchange:
+7. Manage Wi-Fi Credential Exchange:
   - Securely transmit Wi-Fi SSID and password over the BLE characteristic.
   - Handle errors such as authentication failures or timeouts, with appropriate user feedback.
 
-6. Enable Naming and Room Assignment:
+8. Enable Naming and Room Assignment:
   - After successful network join, prompt for a user-friendly device name.
   - Integrate with Home Assistant’s area registry to allow room selection or creation.
 
-7. Error Handling and Edge Cases:
+9. Error Handling and Edge Cases:
   - Cover scenarios such as Bluetooth permissions denied, network unreachable, or device already claimed.
   - Ensure the flow can gracefully abort and offer retries or alternate options.

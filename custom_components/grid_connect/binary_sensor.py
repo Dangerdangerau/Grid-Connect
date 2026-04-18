@@ -18,6 +18,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
+from .device import build_child_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up Grid Connect binary sensor platform."""
     coordinator: DataUpdateCoordinator[Any] = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([GridConnectBinarySensor(coordinator)])
+    async_add_entities([GridConnectBinarySensor(entry, coordinator)])
 
 
 class GridConnectBinarySensor(
@@ -37,10 +38,15 @@ class GridConnectBinarySensor(
 ):
     """Representation of a Grid Connect binary sensor."""
 
-    def __init__(self, coordinator: DataUpdateCoordinator[Any]) -> None:
+    def __init__(
+        self, entry: ConfigEntry, coordinator: DataUpdateCoordinator[Any]
+    ) -> None:
         """Initialize the binary sensor."""
         super().__init__(coordinator)
-        self._attr_name = "Grid Connect Sensor"
+        self._attr_has_entity_name = True
+        self._attr_name = "Sensor"
+        self._attr_unique_id = f"{entry.entry_id}_sensor"
+        self._attr_device_info = build_child_device_info(entry)
         self._attr_device_class = BinarySensorDeviceClass.MOTION
         _LOGGER.debug("Initialized Grid Connect binary sensor")
 

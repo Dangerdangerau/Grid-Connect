@@ -17,6 +17,7 @@ from .api import AuthenticationError
 from .bluetooth import discover_bluetooth_devices
 from .const import CONF_MODEL, DOMAIN
 from .coordinator import GridConnectDataUpdateCoordinator
+from .device import async_ensure_child_device, async_ensure_hub_device
 from .local_api import GridConnectAPI
 from .server import async_setup_provisioning_server
 
@@ -51,6 +52,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: GridConnectConfigEntry) 
     try:
         hass.data.setdefault(DOMAIN, {})
         _LOGGER.info("Setting up Grid Connect entry_id=%s", entry.entry_id)
+        async_ensure_hub_device(hass, entry)
+        async_ensure_child_device(hass, entry)
 
         if entry.data.get("use_bluetooth"):
             # Handle Bluetooth device setup

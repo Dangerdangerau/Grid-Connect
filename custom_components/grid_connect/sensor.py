@@ -26,6 +26,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import CONF_MODEL, DOMAIN, SUPPORTED_ENERGY_SENSOR_MODELS
+from .device import build_child_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -128,6 +129,7 @@ class GridConnectSensor(CoordinatorEntity[DataUpdateCoordinator[Any]], SensorEnt
         self._attr_has_entity_name = True
         self._attr_name = description.name
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
+        self._attr_device_info = build_child_device_info(entry)
 
     @property
     def native_value(self) -> Any:

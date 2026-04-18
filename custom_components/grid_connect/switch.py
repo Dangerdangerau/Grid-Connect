@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_MODEL, DOMAIN, SUPPORTED_SWITCH_MODELS
 from .coordinator import GridConnectDataUpdateCoordinator
+from .device import build_child_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ class GridConnectPlugSwitch(
         self._attr_has_entity_name = True
         self._attr_name = "Power"
         self._attr_unique_id = f"{entry.entry_id}_power"
+        self._attr_device_info = build_child_device_info(entry)
 
     @property
     def is_on(self) -> bool:
