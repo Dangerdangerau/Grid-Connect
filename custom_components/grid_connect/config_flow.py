@@ -164,6 +164,14 @@ def _build_hub_entry_data_from_devices(
     }
 
 
+def _build_empty_hub_entry_data() -> dict[str, Any]:
+    """Build config entry data for a hub with no child devices yet."""
+    return {
+        "hub_name": _HUB_ENTRY_TITLE,
+        "devices": [],
+    }
+
+
 class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Grid Connect."""
 
@@ -310,12 +318,38 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_add_hub(user_input)
         return await self.async_step_add_device(user_input)
 
-    async def _async_step_entry_action(
-        self,
-        step_id: str,
-        user_input: dict[str, Any] | None = None,
+    async def async_step_add_hub(
+        self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Show the shared setup method form for hub/device entry points."""
+        """First-run step for creating or restoring the Grid Connect hub."""
+        existing_entry = self._get_hub_entry()
+        if user_input is not None:
+            if existing_entry is None:
+                return self._create_entry(
+                    title=_HUB_ENTRY_TITLE,
+                    data=_build_empty_hub_entry_data(),
+                )
+
+            self.hass.config_entries.async_update_entry(
+                existing_entry,
+                title=_HUB_ENTRY_TITLE,
+                data={
+                    **existing_entry.data,
+                    "hub_name": _HUB_ENTRY_TITLE,
+                },
+            )
+            await self.hass.config_entries.async_reload(existing_entry.entry_id)
+            return self._abort("hub_restored")
+
+        return self._show_form(
+            step_id="add_hub",
+            data_schema=vol.Schema({}),
+        )
+
+    async def async_step_add_device(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Subsequent step for adding a device to the existing hub."""
         errors: dict[str, str] = {}
         if user_input is not None:
             if user_input.get("action") == "ez":
@@ -327,7 +361,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if user_input.get("action") == "manual":
                 return await self.async_step_manual()
         return self._show_form(
-            step_id=step_id,
+            step_id="add_device",
             data_schema=vol.Schema(
                 {
                     vol.Required("action", default="ez"): vol.In(
@@ -341,18 +375,6 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
         )
-
-    async def async_step_add_hub(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """First-run step for creating the Grid Connect hub."""
-        return await self._async_step_entry_action("add_hub", user_input)
-
-    async def async_step_add_device(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Subsequent step for adding a device to the existing hub."""
-        return await self._async_step_entry_action("add_device", user_input)
 
     async def async_step_ble_scan(
         self, user_input: dict[str, Any] | None = None

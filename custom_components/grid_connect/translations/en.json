@@ -2,7 +2,8 @@
   "config": {
     "abort": {
       "already_configured": "Device is already configured",
-      "device_added_to_hub": "Device added to the existing Grid Connect Hub"
+      "device_added_to_hub": "Device added to the existing Grid Connect Hub",
+      "hub_restored": "Grid Connect Hub restored"
     },
     "error": {
       "cannot_connect": "Failed to connect",
@@ -20,10 +21,7 @@
     "step": {
       "add_hub": {
         "title": "Add Grid Connect hub",
-        "description": "Create the Grid Connect Hub and provision its first device.",
-        "data": {
-          "action": "Setup method"
-        }
+        "description": "Create or restore the Grid Connect Hub. Devices are added in later runs."
       },
       "add_device": {
         "title": "Add Grid Connect device",
