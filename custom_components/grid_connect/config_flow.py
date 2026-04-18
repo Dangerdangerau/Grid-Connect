@@ -18,10 +18,8 @@ from homeassistant import config_entries
 
 # noinspection PyUnresolvedReferences
 from homeassistant.components import bluetooth
-from homeassistant.helpers import device_registry as dr
-
-# noinspection PyUnresolvedReferences
 from homeassistant.core import callback
+from homeassistant.helpers import device_registry as dr
 
 from .ble_wifi import GRID_CONNECT_SERVICE_UUID, send_wifi_credentials
 from .const import CONF_MODEL, DOMAIN, MODEL_PC191BKHA, MODEL_PC191HA, MODEL_SG120HA
