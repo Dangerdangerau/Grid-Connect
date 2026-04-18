@@ -18,12 +18,14 @@ from homeassistant import config_entries
 
 # noinspection PyUnresolvedReferences
 from homeassistant.components import bluetooth
+from homeassistant.helpers import device_registry as dr
 
 # noinspection PyUnresolvedReferences
 from homeassistant.core import callback
 
 from .ble_wifi import GRID_CONNECT_SERVICE_UUID, send_wifi_credentials
 from .const import CONF_MODEL, DOMAIN, MODEL_PC191BKHA, MODEL_PC191HA, MODEL_SG120HA
+from .device import HUB_IDENTIFIER
 from .ez_mode import send_ez_mode_credentials
 
 _LOGGER = logging.getLogger(__name__)
@@ -213,6 +215,11 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         current_entries = self._async_current_entries()
         return current_entries[0] if current_entries else None
 
+    def _has_registered_hub(self) -> bool:
+        """Return True when the Grid Connect hub device exists in the registry."""
+        device_registry = dr.async_get(self.hass)
+        return device_registry.async_get_device(identifiers={HUB_IDENTIFIER}) is not None
+
     def _existing_devices(
         self, entry: config_entries.ConfigEntry | None
     ) -> list[dict[str, Any]]:
@@ -301,7 +308,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Route to the first-run hub step or the add-device step."""
-        if self._get_hub_entry() is None:
+        if self._get_hub_entry() is None or not self._has_registered_hub():
             return await self.async_step_add_hub(user_input)
         return await self.async_step_add_device(user_input)
 
