@@ -18,9 +18,16 @@
       "ble_unknown_error": "Unknown BLE provisioning error."
     },
     "step": {
-      "user": {
+      "add_hub": {
+        "title": "Add Grid Connect hub",
+        "description": "Create the Grid Connect Hub and provision its first device.",
+        "data": {
+          "action": "Setup method"
+        }
+      },
+      "add_device": {
         "title": "Add Grid Connect device",
-        "description": "Scan for nearby BLE devices or enter one manually.",
+        "description": "Add another device to the existing Grid Connect Hub.",
         "data": {
           "action": "Setup method"
         }

@@ -300,7 +300,17 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Entry step: start BLE scan or manual add."""
+        """Route to the first-run hub step or the add-device step."""
+        if self._get_hub_entry() is None:
+            return await self.async_step_add_hub(user_input)
+        return await self.async_step_add_device(user_input)
+
+    async def _async_step_entry_action(
+        self,
+        step_id: str,
+        user_input: dict[str, Any] | None = None,
+    ) -> FlowResult:
+        """Show the shared setup method form for hub/device entry points."""
         errors: dict[str, str] = {}
         if user_input is not None:
             if user_input.get("action") == "ez":
@@ -312,7 +322,7 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if user_input.get("action") == "manual":
                 return await self.async_step_manual()
         return self._show_form(
-            step_id="user",
+            step_id=step_id,
             data_schema=vol.Schema(
                 {
                     vol.Required("action", default="ez"): vol.In(
@@ -326,6 +336,18 @@ class GridConnectConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
         )
+
+    async def async_step_add_hub(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """First-run step for creating the Grid Connect hub."""
+        return await self._async_step_entry_action("add_hub", user_input)
+
+    async def async_step_add_device(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Subsequent step for adding a device to the existing hub."""
+        return await self._async_step_entry_action("add_device", user_input)
 
     async def async_step_ble_scan(
         self, user_input: dict[str, Any] | None = None
